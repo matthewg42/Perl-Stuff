@@ -119,10 +119,7 @@ desc
 
 =head1 LICENSE
 
-__S__ is released under the GNU GPL (version 2, June 1991).  A
-copy of the license should have been provided in the distribution of
-the software in a file called "LICENSE".  If you can't find this, then
-try here: http://www.gnu.org/copyleft/gpl.html
+__S__ is released under the GNU GPL ((version 3, 29 June 2007).
 
 =head1 AUTHOR
 
