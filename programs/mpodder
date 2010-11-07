@@ -61,8 +61,7 @@ sub new {
 	           }, $class;
 
 	# do some sanitizing of text fields
-	$self->{'title'} =~ s/–/-/g;
-	$self->{'title'} =~ s/’/'/g;
+	$self->{'title'} = main::sanitize_string($self->{'title'});
 
 	main::db_out(9, "PodCastItem.new: generated new item title: " . $self->{'title'});
 
@@ -196,10 +195,8 @@ sub new {
 	           }, $class;
 
 	# do some sanitizing of text fields
-	$self->{'title'} =~ s/–/-/g;
-	$self->{'title'} =~ s/’/'/g;
-	$self->{'description'} =~ s/–/-/g;
-	$self->{'description'} =~ s/’/'/g;
+	$self->{'title'} = main::sanitize_string($self->{'title'});
+	$self->{'description'} = main::sanitize_string($self->{'description'});
 
 	main::db_out(9, "PodCastFeed.new: generated new feed URL: " . $self->{'url'});
 
@@ -331,7 +328,7 @@ sub update {
 		                               'create_date'     => main::get_now(),
 		                               'pub_date'        => $pub_date->strftime("%s"),
 		                               'media_url'       => $ep_media_url,
-		                               'media_length'    => $enc->length || undef,
+		                               'media_length'    => main::parse_media_length($enc->length),
 		                               'media_type'      => $enc->type || undef,
 		                               'listened'        => 0);
 
@@ -1348,6 +1345,37 @@ sub db_make_update_clause {
 #########################################################################
 # Misc functions
 ##
+sub sanitize_string {
+	my $_ = shift;
+	s/–/-/g;
+	s/’/'/g;
+	s/»/>/g;
+	s/«/</g;
+	return $_;
+}
+
+sub parse_media_length {
+	# this function always returns undef or a number of bytes as an integer
+	# it can handle media lengths which look like any of these:
+	# 123.45 MB
+	# 123.45 MB
+	my $_ = shift || return undef;
+	if (/^\d+$/) { return $_; }
+	elsif (/^(\d+(\.(\d+))?)\s*mi?b$/i) { 
+		return int($1 * 1000000);
+	}
+	elsif (/^(\d+(\.(\d+))?)\s*ki?b$/i) { 
+		return int($1 * 1000);
+	}
+	elsif (/^(\d+(\.(\d+))?)\s*gi?b$/i) { 
+		return int($1 * 1000000000);
+	}
+	else {
+		db_out(0, "parse_media_length: input \"$_\" isn't recognised");
+		return undef;
+	}
+}
+
 sub nvl {
 	my $undef_value = shift;
 	if (!defined($undef_value)) { die "nvl: first argument should be the undefined value"; }
