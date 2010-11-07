@@ -1,0 +1,511 @@
+#!/usr/bin/perl -w
+#
+
+use strict;
+use Getopt::Long;
+use Text::Abbrev;
+use Stuff::Debug    qw(db_out);
+use Stuff::Usage    qw(usage long_usage version_message);
+use Stuff::ByteSize qw(bytes2sz);
+use Stuff::StatSet;
+use Stuff::Table;
+
+use constant STUFF_PROG_DESCRIPTION => "groupby key and perform aggregate fuctions";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2004; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.02";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+
+# This is the list of operations.  unambigious abbreviations to the
+# --operation can be used, so we'll use the abbrev function from
+# Text::Abbrev for generating a hash where the keys are all possible
+# unambigious abbreviations, and the keys are the original operation
+# names.  
+
+my %gh_operation_abbrevs = abbrev qw(sum minimum maximum mean median average count);
+
+my %gh_operation_types = (
+			  'sum'      => "f",
+			  'minimum'  => "f",
+			  'maximum'  => "f",
+			  'mean'     => "f",
+			  'median'   => "f",
+			  'average'  => "f",
+			  'count'    => "d",
+			  'minimum'  => "f",
+			  );
+
+# This object is used to do the statistical calculation.
+my %gh_groups;
+my $go_numbers = Stuff::StatSet->new();
+
+# Now for some command line option flag variables.
+my $gs_flag_size                = 0;
+my $gs_flag_precision           = 1;
+my $gs_flag_stdin               = 0;
+my $gs_flag_key_field           = 1;
+my $gs_flag_trim                = 1;
+my $gs_flag_field_delimiter     = '\s+'; 
+my $gs_flag_value_field         = 2;
+my $gs_flag_case_insensitive    = 0;
+my $gs_flag_max_key_length      = undef;
+my $gs_flag_column_names        = 0;
+my $gs_flag_sort                = 0;
+my $gs_flag_numeric_sort        = 0;
+my $gs_flag_operation           = "sum";
+my $gs_flag_non_numerical_value = 0;
+my $gs_flag_reverse_sort        = 0;
+
+GetOptions(
+	   'column-names!'       => \$gs_flag_column_names,
+	   'debug=i'             => \$Stuff::Debug::debug_level{S},
+	   'delimiter=s'         => \$gs_flag_field_delimiter,
+	   'help'                => sub { long_usage(0) },
+	   'ignore-case!'        => \$gs_flag_case_insensitive,
+	   'key-field=s'         => \$gs_flag_key_field,
+	   'max-key-length=i'    => \$gs_flag_max_key_length,
+	   'non-numeric-value=i' => \$gs_flag_non_numerical_value,
+	   'numeric-sort'        => \$gs_flag_numeric_sort,
+	   'operation=s'         => \$gs_flag_operation,
+	   'precision=i'         => \$gs_flag_precision,
+	   'reverse-sort'        => \$gs_flag_reverse_sort,
+	   'sort'                => \$gs_flag_sort,
+	   'trim!'               => \$gs_flag_trim,
+	   'value-field=s'       => \$gs_flag_value_field,
+	   'version'             => sub { version_message(); exit 0; },
+	   )     or usage(1);
+
+# Some validations of parameters / switches
+
+if ( $gs_flag_sort + $gs_flag_numeric_sort > 1 ) {
+    die "cannot have both --sort and --numeric-sort options enabled at the same time.";
+}
+
+if ( $gs_flag_key_field !~ /^\d+$/ && $gs_flag_key_field ne "last" ) {
+    die "key field must be an integer or \"last\"";
+} 
+
+if ( $gs_flag_value_field !~ /^\d+$/ && $gs_flag_value_field ne "last" ) {
+    die "value field must be an integer or \"last\"";
+} 
+
+my @ga_operations;
+my @ga_found_key_order;
+
+
+
+# OK, call the read loop.  This parses ARGV for parameters, and then
+# reads from stdin until there is no more.  The resulting numbers are
+# inserted into $go_numbers by the do_read_loop function.
+
+do_check_operation();   # NOTE: this will populate @ga_operations 
+do_read_input();
+do_output();
+
+##############################################################################
+# Sub-routines
+##############################################################################
+
+sub do_check_operation
+{
+    my @ops;
+
+    if ( $gs_flag_operation eq "all" ) {
+	@ops = qw(count sum minimum maximum mean median);
+    }
+    else {
+	@ops = split(/,+/, $gs_flag_operation);
+    }
+
+    foreach my $op (@ops) {
+	if ( ! defined( $gh_operation_abbrevs{$op} ) )
+	{
+	    db_out(0, "do_check_operation: The operation you specified \"$op\" isn't known or is not an unambibious abbreviation of a known operation, I will skipp it.");
+	}
+	else
+	{
+	    push @ga_operations, $gh_operation_abbrevs{$op};
+	    db_out(3,"operation recognized: $op ==> $gs_flag_operation");
+	}
+    }
+
+    if ( $#ga_operations < 0 ) {
+	die "No recognised operations were specified!";
+    }
+}
+
+sub do_read_input
+{
+    while(<>) 
+    {
+	chomp;
+
+	if ( $gs_flag_trim ) {
+	    s/^\s+//;
+	    s/\s+$//;
+	}
+
+	@_ = split(/$gs_flag_field_delimiter/);
+
+	my $kf;
+	if ( $gs_flag_key_field eq "last" ) {
+	    $kf = $#_;
+	}
+	else {
+	    $kf = $gs_flag_key_field - 1;
+	}
+
+	my $k = $_[$kf];
+
+	if ( ! defined($k) ) {
+	    db_out(3,"Input line $. has no key field - skipping");
+	    next;
+	}
+
+	if ( $gs_flag_case_insensitive ) {
+	    $k = lc($k);
+	}
+
+	if ( defined($gs_flag_max_key_length) ) {
+	    $k = substr($k, 0, $gs_flag_max_key_length);
+	}
+
+	my $vf;
+	if ( $gs_flag_value_field eq "last" ) {
+	    $vf = $#_;
+	}
+	else {
+	    $vf = $gs_flag_value_field - 1;
+	}
+	
+	my $v = $_[$vf];
+
+	if ( ! is_numeric($v) ) {
+	    $v = $gs_flag_non_numerical_value;
+	}
+	
+	if ( ! defined( $gh_groups{$k} ) ) {
+	    push @ga_found_key_order, $k;
+	    $gh_groups{$k} = Stuff::StatSet->new();
+	}
+
+	$gh_groups{$k}->add_members($v);
+    }
+}
+
+sub is_numeric 
+{
+    my $i = shift;
+
+    if (     $i =~ /^\d+$/ 
+	  || $i =~ /^\d+\.\d*$/   
+	  || $i =~ /^\d*\.\d+$/
+	     ) {
+	return 1;
+    }
+    else
+    {
+	return 0;
+    }
+}
+
+sub do_output
+{
+    my $max_keylen = 3;
+    my $tab = new Stuff::Table;
+
+    foreach my $k (keys %gh_groups) { if ( length($k) > $max_keylen ) { $max_keylen = length($k); } }
+
+    $tab->add_column(     'name'   => "key", 
+			  'title'  => "KEY", 
+			  'format' => "s", 
+			  'width'  => $max_keylen,
+			  );
+  
+    for(my $i=0; $i <= $#ga_operations; $i++) {
+	$tab->add_column( 'name'   => "agg$i", 
+			  'title'  => uc($ga_operations[$i]), 
+			  'format' => "s",
+			  'align'  => "right",
+			  'width'  => 14,
+			  );  
+    }
+
+    if ( $gs_flag_column_names ) {
+	print $tab->title_str();
+	print $tab->underline_str();
+    }
+
+    my @keylist;
+
+    if ( $gs_flag_sort ) {
+	@keylist = sort keys %gh_groups;
+    }
+    elsif ( $gs_flag_numeric_sort ) {
+	@keylist = sort { $a <=> $b } keys %gh_groups;
+    }
+    else {
+	@keylist = @ga_found_key_order;
+    }
+
+    if ( $gs_flag_reverse_sort ) {
+	@keylist = reverse @keylist;
+    }
+
+    foreach my $k (@keylist) {
+	my @row = ($k);
+	
+	for(my $i=0; $i <= $#ga_operations; $i++) {
+	    my $agg;
+
+	    if ( $ga_operations[$i] eq "sum" )
+	    {
+		$agg = $gh_groups{$k}->sum;
+	    }
+	    elsif ( $ga_operations[$i] eq "minimum" )
+	    {
+		$agg = $gh_groups{$k}->min;
+	    }
+	    elsif ( $ga_operations[$i] eq "maximum" )
+	    {
+		$agg = $gh_groups{$k}->max;
+	    }
+	    elsif ( $ga_operations[$i] eq "mean" || $ga_operations[$i] eq "average" )
+	    {
+		$agg = $gh_groups{$k}->mean;
+	    }
+	    elsif ( $ga_operations[$i] eq "median" )
+	    {
+		$agg = $gh_groups{$k}->median;
+	    }
+	    elsif ( $ga_operations[$i] eq "count" )
+	    {
+		$agg = $gh_groups{$k}->count;
+	    }
+	    else
+	    {
+		die "erk, operation \"$ga_operations[$i]\" is not known, ABORTING";
+	    }
+
+	    if ( $gh_operation_types{$ga_operations[$i]} eq "f" ) {
+		$agg = sprintf("%.${gs_flag_precision}f", $agg);
+	    }
+
+	    push @row, $agg;
+	}
+
+	print $tab->array_row(@row);
+    }
+}
+
+sub do_all_operations
+{
+    foreach my $op (qw (sum count minimum maximum mean median)) 
+    {
+	printf "%-10s ", $op;
+	$gs_flag_operation = $op;
+	do_output();
+    }
+}
+
+
+__END__
+
+=head1 NAME 
+
+groupby - sum, min, max of numerical values on some key
+
+=head1 SYNOPSIS
+
+groupby [options] operation(s)
+
+=head1 DESCRIPTION
+
+groupby reads data from standard input.  The data is split by a
+delimiter regular expression.  A key field and value field are
+extracted from fixed positions in the split data, and numerical values
+are accumulated for each key.  When the end of input is reached,
+a table of results is printed with one row per "key" encountered in
+the left column.  Additional columns correspond to the aggregate
+operation(s) specified on the command line.
+
+For example, if the command is:
+
+C<groupby count sum>
+
+...And the data is:
+
+C<A 5
+B 3
+A 4
+C 3
+B 1
+A 9>
+
+... Then the output would be something like:
+
+C<A 3 18>
+C<B 2 4>
+C<C 1 3>
+
+=head1 OPTIONS
+
+=over
+
+=item B<--column-names> or B<--nocolumn-names>
+
+This option can be used to cause output of column names in the output
+table.  By default no column names are printed.
+
+=item B<--debug>=I<level>
+
+Set the script debugging level to I<level>.  This switch sets all
+types of debugging to this level.  If you want to discriminate between
+the various debugging types (MOdule, DBase, SCript), you should set
+the relevant environment variables instead of using this option.
+
+=item B<--delimiter>=I<d>
+
+Sets the delimiter to the perl regular expression I<d>.  By default
+the delimiter is "\s+".
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--ignore-case> or B<--noignore-case>
+
+Sets case [in]sensitivity for the key values.  By default keys ARE case
+sensitive (as is the Unix tradition to keep things case sensitive). 
+
+=item B<--key-field>=I<n>
+
+Sets the number of the key field to I<n>, (1 is the first.  My perl
+fettishism urged 0 to be the first field, but it is 1 to maintain
+consistency with the classic cut(1) program).  The default is 1.
+
+I<n> may be specified as "last", in which case the last field on the
+line will be used.
+
+=item B<--max-key-length>=I<n>
+
+If this is set, key values are truncated to a maximum of I<n>
+characters before aggregation.  By default there is no maximum key
+length.
+
+=item B<--non-numeric-value>=I<n>
+
+When a value is encountered that is non-numerical I<n> will be used
+instead.  The default is 0.
+
+Sort the output by key in numeric order.
+
+=item B<--numeric-sort>
+
+Sort the output by key in numeric order.
+
+=item B<--opertion>=I<op[,op[,...]]>
+
+Speciy the aggregate operations to be performed.  If more than one
+operation is required, a list should be provided separated by
+commas. e.g. B<--operation>=I<count,sum>.  Columns will appear in the
+output in the order in which that are specified.  By default the
+operation is L<sum>.
+
+=item B<--precision>=I<n>
+
+Sets the precision (number of decimal places) to which floating point
+results are represented in the output.  Note that this only affects
+numbers that might be floating point, so COUNT will not be shown with
+decimal places, even if this flag is specified.  The default is 1 d.p.
+
+=item B<--sort>
+
+Sort output by key name (lexical order).
+
+=item B<--trim> or B<--notrim>
+
+If trim is set, whitespace is removed from the start of the line
+before any processing is done.  This may affect the value of the
+key field if it is the first field.  By default trim IS set.
+
+=item B<--value-field>=I<n>
+
+Sets the number of the value field to I<n>.  The default value
+field is 2.
+
+I<n> may be specified as "last", in which case the last field on the
+line will be used.
+
+=item B<--version>
+
+Print the program identification and version number.
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_??_DBLEVEL
+
+Sets debugging levels.  The ?? can be DB for database, MO for module,
+or SC for script debugging messages.  Generally only SC and DB are
+interesting for users, MO is mostly just used during development.
+
+=back
+
+=head1 FILES
+
+N/A
+
+=head1 LICENSE
+
+groupby is released under the GNU GPL (version 2, June 1991).
+
+=head1 AUTHOR
+
+Matthew Gates
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2004-12-22 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Specifying numeric sorting when keys are non-numeric will cause problems!
+
+Please report bugs using L<mng_bug_report>.
+
+=head1 FUTURE DEVELOPMENT
+
+Possible addition of standard deviation to operations list.
+
+=over
+
+=item Sort by other columns
+
+=item Add an "all" target
+
+=item Better column width handling (varies by type)
+
+=back
+
+=head1 SEE ALSO
+
+L<Stuff::StatSet>
+
+=cut
+

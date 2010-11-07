@@ -1,0 +1,266 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Getopt::Long;
+use Stuff::Debug qw(&db_out $this_script);
+use Stuff::Usage qw(&usage &long_usage &version_message);
+use Stuff::Morse qw(&morse_to_ascii &set_morse_dialect);
+
+use constant STUFF_PROG_DESCRIPTION => "Morse code to ASCII filter";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2005; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.02";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+my $gs_flg_char_echo = 0;
+my $gs_flg_dialect = "international";
+my $gs_flg_mode = "line";
+
+GetOptions(
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   'dialect=s'         => \$gs_flg_dialect,
+	   'echo!'             => \$gs_flg_char_echo,
+	   'help'              => sub { long_usage(0) },
+	   'input-mode=s'      => \$gs_flg_mode,
+	   'version'           => sub { version_message(); exit 0; },
+	   )     or usage(1);
+
+my $gs_old_stty = undef;
+
+# Set the dialect
+set_morse_dialect($gs_flg_dialect);
+
+$SIG{__DIE__} = &restore_terminal;
+$SIG{TERM}    = &restore_terminal;
+$SIG{HUP}     = &restore_terminal;
+$SIG{HUP}     = &restore_terminal;
+$SIG{ABRT}    = &restore_terminal;
+
+if ( $gs_flg_mode =~ /(line)|(l)/i ) {
+    while(<>) {
+	chomp;
+
+	if ( /^\s*$/ ) {
+	    print "\n\n";
+	}
+	else {
+	    chomp;
+	    print morse_to_ascii($_);
+	}
+    }
+}
+elsif ( $gs_flg_mode =~ /(character)|(char)|(c)/i ) {
+    my $un = `uname`;
+    chomp $un;
+    if ( $un !~ /Linux/i ) {
+	warn "character input mode uses stty.  The arguments work with Linux, but you may get weirdness on your system ($un).  BSD for sure is weird\n";
+    }
+
+    $gs_old_stty = `stty -g`;
+    chomp $gs_old_stty;
+    
+    db_out(3,"character mode for uname $un.  Sending: 'stty', '-icanon', 'eol', '\001';");
+    system "stty", '-icanon', 'eol', "\001";
+
+    if ( ! $gs_flg_char_echo ) {
+	system "stty", '-echo';
+    }
+
+    if ( $#ARGV < 0 ) {
+	char_fh(\*STDIN);
+    }
+    else {
+	foreach my $f (@ARGV) {
+	    open(F, "<$f") || die "cannot open file $f for reading";
+	    char_fh(\*F);
+	    close(F);
+	}
+    }
+
+    # restore terminal status
+    restore_terminal();
+}
+else {
+    die "unknown input mode \"$gs_flg_mode\"";
+}
+
+
+sub char_fh {
+    my $fh = shift || die "oops, char_fh didn't get a parameter";
+    
+    my $c = getc($fh);
+    my $last = "";
+    my $buf = "";
+
+
+    while (defined($c)) {
+	if ( $c eq "\n" && $last eq "\n" ) {
+	    print "\n";
+	}
+	elsif ( $c eq " " || $c eq "\n" ) {
+	    # $buf should now contain one letter, process it and clear $buf
+	    buf_m2a($buf);
+	    $buf="";
+ 	}
+	elsif ( $c eq "/" ) {
+	    print " ";
+	}
+	else {
+	    # If we get a ^D, it is end of data...  This many not be very portable.
+	    # Anyhow if we see it, we will print what's in the buffer and exit.
+	    if ( unpack("c", $c) == 4 ) {
+		buf_m2a($buf);
+		last;
+	    }
+
+	    $buf .= $c;
+	    db_out(6,"getc got another character: \"$c\";  \$buf is now \"$buf\"");
+	}
+
+	$last = $c;
+	$c = getc($fh);
+    }
+
+    print "\n";
+}
+
+sub buf_m2a {
+    my $buf = shift;
+    if ( ! defined($buf) ) {
+	warn "buf_m2a was called without a paramater\n";
+	return 0;
+    }
+
+    if ( $buf ne "" ) {
+	db_out(5, "converting morse letter: $buf");
+	print morse_to_ascii($buf);
+	$buf="";
+    }
+    else {
+	db_out(6, "\$buf is empty - not printing anything");
+    }    
+}
+
+sub restore_terminal {
+    if ( defined( $gs_old_stty ) ) {
+	db_out(6,"restore_terminal re-setting original stty stuff: $gs_old_stty");
+	system("stty", "$gs_old_stty");
+    }
+}
+
+__END__
+
+=head1 NAME 
+
+morse2ascii - convert morse code to text
+
+=head1 SYNOPSIS
+
+morse2ascii [options] [[file [file] ...]
+
+=head1 DESCRIPTION
+
+Reads from standard input, or a list of files if specified on the
+command line.  Outputs the file's morse code content as text. 
+
+=head1 OPTIONS
+
+=over
+
+=item B<--debug>=I<level>
+
+Print diagnostic messages while executing.  The value of I<level> must be an
+integer.  The higher the number, the more verbose the diagnostic output will
+be.
+
+=item B<--dialect>=I<d>
+
+Sets the dialect to I<d>.  I<d> may be "international", "american", an
+alias for one of those or any unique abbreviation of those options.
+For more info, see the Stuff::Morse manual page.
+
+=item B<--echo> or B<--noecho>
+
+This option only effects "character" input mode.  By default, echoing
+of keypresses (i.e. the morse) are turned off.  Using B<--echo> will 
+allow morse echos to the terminal.
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--input-mode>=I<m>
+
+Sets the input mode.  Possible values are "line" (or "l") and
+"character" (or "c").  Line mode is the default.  This option affects
+how morse2ascii reads input.  
+
+In line mode no conversion/output is done until a new-line is read.
+This is more efficient than character mode, and is probably the best
+for non-realtime conversions.  A newline character is interpretted as
+a work break, blank lines will cause a newline character to be
+inserted in the output.
+
+In character mode each character is converted and outputed for each
+input character.  This is quite a bit less efficient, but may be
+desirable for real-time applications.
+
+=item B<--version>
+
+Print the program description and version.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_?_DBLEVEL
+
+Sets debugging levels.  The ? can be D for database, M for module,
+or S for script debugging messages.  Generally only S and D are
+interesting for users, M is mostly just used during development.
+
+=back
+
+=head1 FILES
+
+N/A
+
+=head1 LICENSE
+
+morse2ascii is released under the GNU GPL (version 2, June 1991).
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2005-02-09 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+ascii2morse(1), Stuff::Morse(3).
+
+=cut
+
