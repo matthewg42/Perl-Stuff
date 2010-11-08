@@ -1,15 +1,15 @@
 Source: libstuff-usage-perl
 Section: perl
 Priority: optional
-Build-Depends: debhelper (>= 7), libstuff-debug-perl
+Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: perl
 Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
-Homepage: http://search.cpan.org/dist/Stuff-Usage/
+Homepage: https://launchpad.net/stufftools/
 
 Package: libstuff-usage-perl
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
 Description: (no short description found)
  This is for extracting long and short help messages from embedded POD
  documentation in a program. The aim is to allow all documantation to be in

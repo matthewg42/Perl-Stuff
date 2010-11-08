@@ -1,15 +1,15 @@
 Source: libstuff-morse-perl
 Section: perl
 Priority: optional
-Build-Depends: debhelper (>= 7), libstuff-debug-perl
+Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: perl
 Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
-Homepage: http://search.cpan.org/dist/Stuff-Morse/
+Homepage: https://launchpad.net/stufftools/
 
 Package: libstuff-morse-perl
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
 Description: morse code fun with perl
  For converting ASCII to and from Morse code. The module supports English
  language only at this time (no accented or non-latin character set letters),

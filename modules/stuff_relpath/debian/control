@@ -1,15 +1,15 @@
 Source: libstuff-relpath-perl
 Section: perl
 Priority: optional
-Build-Depends: debhelper (>= 7), libstuff-debug-perl, libstuff-text-perl
+Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: perl
 Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
-Homepage: http://search.cpan.org/dist/Stuff-RelPath/
+Homepage: https://launchpad.net/stufftools/
 
 Package: libstuff-relpath-perl
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl, libstuff-text-perl
 Description: (no short description found)
  Stuff::RelPath is used to generate relative paths for the creation of
  symbolic links. It does no filesystem checking at all - it is simply

@@ -2311,62 +2311,17 @@ The log file contains a history of which podcasts have been downloaded
 in the past.  This way we can avoid re-downloading a podcast even if
 the actual mp3/ogg file is gone.
 
-=head1 LICENSE
-
-mpodder is released under the GNU GPL (version 2, June 1991).  A
-copy of the license should have been provided in the distribution of
-the software in a file called "LICENSE".  If you can't find this, then
-try here: http://www.gnu.org/copyleft/gpl.html
-
 =head1 AUTHOR
 
-Matthew Gates <matthew@porpoisehead.net>
+Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
 
-http://porpoisehead.net/
+=head1 COPYRIGHT & LICENSE
 
-=head1 CHANGELOG
+Copyright (C) 2010 by Matthew Gates
 
-=over
-
-=item Date:2005-06-11 Version 0.02
-
-All of the critical functionality is now done.  The interactive config
-mode is still to be implemented, but apart from that we have a working
-tool. 
-
-=item Date:2005-05-09 Created, Author MNG
-
-RSS parser done, still to do: download stuff, logging, interactive
-config etc.  I changed to LWP::Simple (from full LWP) - don't need any
-of the facy stuff...
-
-=back
-
-=head1 DEPENDENCIES
-
-This script uses various external programs to accomplish it's work.  They are:
-
-=over 
-
-=item Stuff::Debug Stuff::Usage Stuff::Text
-
-These are all part of the basic Stuff package.  You can download it from here: http://www.porpoisehead.net/mysw/index.php?pgid=download_index
-
-=item wget and/or curl
-
-I recommend wget since curl doesn't seem to follow some re-directions as well as wget.
-
-=item mailx (command line mail utility)
-
-There is a very good chance this comes pre-installed with the default
-settings of your Linux/BSD distribution.
-
-=item pod2usage
-
-This comes as standard with perl since some time.  It's used for the
-production of the output of the B<--help> option.
-
-=back
+This program is released under the terms of the GNU GPL Version 3, 29 June 2007.
+A copy of this license should have been provided with this software (filename
+LICENSE).  The license may also be found at http://www.gnu.org/licenses/gpl.html
 
 =head1 BUGS
 

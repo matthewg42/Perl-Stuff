@@ -1,15 +1,15 @@
 Source: libstuff-fieldset-perl
 Section: perl
 Priority: optional
-Build-Depends: debhelper (>= 7), libstuff-debug-perl
+Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: perl
 Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
-Homepage: http://search.cpan.org/dist/Stuff-FieldSet/
+Homepage: https://launchpad.net/stufftools/
 
 Package: libstuff-fieldset-perl
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
 Description: Stuff::FieldSet
  TODO - Umm. I think we need to implement it first. Then doeument it. Or maybe
  the other way round. Whatever, I work backwards anyway.

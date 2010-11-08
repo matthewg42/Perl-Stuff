@@ -1,14 +1,37 @@
-Format-Specification: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=135
-Maintainer: Matthew Gates <matthew@porpoisehead.net>
-Source: https://launchpad.net/stufftools/
-Name: Stuff-Chart
+#!/usr/bin/perl
+#
+# dh-make-perl seems to fail to get the LGPL stuff, so I wrote this to 
+# fix the copyright info...
+
+foreach my $f (@ARGV) {
+	print "processing file $f...\n";
+	my $old = "$f.old";
+	system('mv', $f, $old);
+	open(OLD, "<$old") || die "cannot open old file for reading: $old";
+	open(NEW, ">$f") || die "cannot open new file for writing: $f";
+
+	while(<OLD>) {
+		if ( /^Name:/ ) {
+			print NEW $_;
+			print NEW new_copyright() . "\n";
+			last;
+		}
+		print NEW $_;
+	}
+	close(OLD);
+	close(NEW);
+	unlink $old;
+}
+
+sub new_copyright {
+	return <<EOD;
 
 Files: *
-Copyright: Matthew Gates <matthew@porpoisehead.net>
+Copyright: Matthew Gates <matthew\@porpoisehead.net>
 License: LGPL-3+
 
 Files: debian/*
-Copyright: 2010, Matthew Gates <matthew@porpoisehead.net>
+Copyright: 2010, Matthew Gates <matthew\@porpoisehead.net>
 License: Artistic
 
 License: LGPL-3+
@@ -26,4 +49,5 @@ License: Artistic
  .
  On Debian GNU/Linux systems, the complete text of the Artistic License
  can be found in `/usr/share/common-licenses/Artistic'
-
+EOD
+}

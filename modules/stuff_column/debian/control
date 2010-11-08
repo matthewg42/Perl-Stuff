@@ -1,15 +1,15 @@
 Source: libstuff-column-perl
 Section: perl
 Priority: optional
-Build-Depends: debhelper (>= 7), libstuff-debug-perl
+Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: perl
 Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
-Homepage: http://search.cpan.org/dist/Stuff-Column/
+Homepage: https://launchpad.net/stufftools/
 
 Package: libstuff-column-perl
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
 Description: models a table column for fixed font use
  Stuff::Column is an object module that models a table column. It was created
  for use by Stuff::Table.

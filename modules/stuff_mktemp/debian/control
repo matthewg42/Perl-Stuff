@@ -1,15 +1,15 @@
 Source: libstuff-mktemp-perl
 Section: perl
 Priority: optional
-Build-Depends: debhelper (>= 7), libstuff-debug-perl
+Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: perl
 Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
-Homepage: http://search.cpan.org/dist/Stuff-Mktemp/
+Homepage: https://launchpad.net/stufftools/
 
 Package: libstuff-mktemp-perl
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
 Description: Stuff::Mktemp
  Stuff::Mktemp began life as a habit of writing my own mktemp function in
  shell scripts on some old Solaris boxen where the system mktemp was buggy.
