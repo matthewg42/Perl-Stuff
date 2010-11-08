@@ -45,7 +45,7 @@ require Exporter;
 @EXPORT_OK  = qw(&mktemp $temp_dir @temp_files &cleanup_temp_files $tempfile_prefix $tempfile_tries);
 
 use strict;
-use vars qw(@temp_files $temp_dir $tempfile_prefix $tempfile_tries);
+use vars qw(@temp_files $temp_dir $tempfile_prefix $tempfile_tries $VERSION);
 use Stuff::Debug qw(db_out);
 
 BEGIN {

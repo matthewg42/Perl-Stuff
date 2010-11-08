@@ -41,7 +41,7 @@ require Exporter;
 
 use strict;
 use Carp;
-use vars qw($max_value $min_value);
+use vars qw($max_value $min_value $VERSION);
 use Stuff::Debug qw(db_out);
 use Stuff::Range;
 

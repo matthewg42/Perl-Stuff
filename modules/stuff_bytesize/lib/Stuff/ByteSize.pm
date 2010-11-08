@@ -35,6 +35,7 @@ require Exporter;
 
 use strict;
 use Stuff::Debug;
+use vars qw($VERSION);
 
 BEGIN {
     $VERSION = '0.03';

@@ -68,7 +68,7 @@ use POSIX;
 @EXPORT_OK  = qw(%debug_level $debug_handle $debug_timefmt $this_script);
 
 use strict;
-use vars qw(%debug_level $debug_handle $debug_timefmt $this_script);
+use vars qw(%debug_level $debug_handle $debug_timefmt $this_script $VERSION);
 use File::Basename;
 
 BEGIN {

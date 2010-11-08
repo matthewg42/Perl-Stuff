@@ -26,8 +26,8 @@ use Stuff::Debug qw(db_out);
 use overload ('==' => "equal_to");
 
 BEGIN {
+    use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
     $VERSION = '0.02';
-    use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
     @ISA         = qw(Exporter);
     @EXPORT      = qw();
     %EXPORT_TAGS = qw();

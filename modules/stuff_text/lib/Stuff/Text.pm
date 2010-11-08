@@ -13,6 +13,7 @@ Text manipulation gubbins.
 =cut
 
 use strict;
+use vars qw($VERSION);
 use Carp;
 use POSIX;
 use Stuff::Debug qw(db_out);

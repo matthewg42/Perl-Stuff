@@ -26,6 +26,7 @@ require Exporter;
 @EXPORT_OK = qw();
 
 use strict;
+use vars qw($VERSION);
 use Carp;
 use Stuff::Debug qw(db_out);
 

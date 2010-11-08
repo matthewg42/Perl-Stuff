@@ -30,6 +30,7 @@ require Exporter;
 @EXPORT_OK  = qw(&usage &long_usage &full_usage &version_message);
 
 use strict;
+use vars qw($VERSION);
 use File::Basename;
 use Stuff::Debug qw(db_out $this_script);
 

@@ -30,6 +30,7 @@ require Exporter;
 @EXPORT_OK  = qw(&relative_path $directory_serarator);
 
 use strict;
+use vars qw($VERSION);
 use File::Basename;
 use Stuff::Debug qw(&db_out $this_script);
 use Stuff::Text qw(&delimit_data);

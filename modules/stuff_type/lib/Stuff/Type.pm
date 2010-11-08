@@ -10,6 +10,7 @@ TODO!
 
 =cut
 
+use vars qw($VERSION);
 use Stuff::Debug qw(db_out);
 use overload ('+'  => "add",
 	      '-'  => "subtract",

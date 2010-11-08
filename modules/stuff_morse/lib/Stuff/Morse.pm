@@ -41,7 +41,7 @@ require Exporter;
 
 use strict;
 use vars qw(%dialect_aliases %dialect_abbrev $dialect %morse_char_data 
-	    %morse2ascii %ascii2morse);
+	    %morse2ascii %ascii2morse $VERSION);
 use File::Basename;
 use Text::Abbrev;
 use Stuff::Debug qw(db_out);
