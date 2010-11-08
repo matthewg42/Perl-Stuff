@@ -698,25 +698,35 @@ sub mpodder_list {
 
 	$t->add_column('name' => 'ID', 'format' => 'd', 'width' => 3, 'align' => 'right');
 	$t->add_column('name' => 'Title', 'format' => 's', 'width' => $title_w);
-	$t->add_column('name' => 'Last Update', 'format' => 's', 'width' => 20);
-	$t->add_column('name' => 'Available/Total', 'format' => 's', 'align' => 'right');
+	$t->add_column('name' => 'Last Episode Date', 'format' => 's', 'width' => 20);
+	$t->add_column('name' => 'Dld', 'format' => 'd', 'align' => 'right');
+	$t->add_column('name' => 'DlR', 'format' => 'd', 'align' => 'right');
+	$t->add_column('name' => 'Total', 'format' => 'd', 'align' => 'right');
 
 	print $t->title_str();
 	print $t->underline_str();
 
 	foreach my $f (@feeds) {
 		my @episodes = $f->get_items();
-		my $unlistened = 0;
+		my $last_ep_date = undef;
+		my $edownloaded = 0;
+		my $eunlistened = 0;
+		my $etotal = 0;
 		foreach my $ep (@episodes) {
-			if (($ep->{'listened'} || 0) == 0) { $unlistened++; }
+			if (($ep->{'pub_date'}||0) > ($last_ep_date||0)) {
+				$last_ep_date = $ep->{'pub_date'};
+			}
+			if ($ep->local_file_exists()) { $edownloaded++; }
+			elsif (($ep->{'listened'} || 0) == 0) { $eunlistened++; }
+			$etotal++;
 		}
 		
-		my $outof = sprintf("%4d / %4d", $unlistened, $#episodes+1);
-
 		print $t->array_row($f->{'id'},
 		                    $f->{'title'} || '<no title>',
-		                    defined($f->{'update_date'}) ? DateTime->from_epoch('epoch' => $f->{'update_date'}) : "-",
-		                    $outof);
+		                    defined($last_ep_date) ? DateTime->from_epoch('epoch' => $last_ep_date)->strftime("%Y-%m-%d %T") : "-",
+		                    $edownloaded, 
+		                    $eunlistened, 
+		                    $etotal);
 	}
 	print "\n";
 
@@ -1336,8 +1346,8 @@ sub sanitize_string {
 	my $_ = shift;
 	s/–/-/g;
 	s/’/'/g;
-	s/»/>/g;
-	s/«/</g;
+	s/»/=-/g;
+	s/«/-=/g;
 	return $_;
 }
 
@@ -1627,6 +1637,7 @@ sub download_enqueued_items {
 		}
 
 		$item->{'download_date'} = get_now();
+		$item->{'listened'} = 1;
 		$item->save();
 	}
 
@@ -1648,6 +1659,7 @@ sub nomsan {
 	s/\s+$//g;
 	s/%20/_/g;
 	s/\#//g;
+	s/!/_/g;
 	s/ /_/g;
 	s/_+/_/g;
 	s/[–\(\)\[\]\{\}\\]/-/g;
