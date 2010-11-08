@@ -382,39 +382,39 @@ use DateTime;
 use XML::Feed;
 use XML::Feed::Enclosure;
 
-use constant STUFF_PROG_DESCRIPTION => "mpodder";
-use constant STUFF_PROG_COPYRIGHT   => "(C) 2010; released under the GNU GPL version 3";
-use constant STUFF_PROG_VERSION     => "0.04";
-use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+use constant STUFF_PROG_DESCRIPTION => 'mpodder';
+use constant STUFF_PROG_COPYRIGHT   => '(C) 2010; released under the GNU GPL version 3';
+use constant STUFF_PROG_VERSION     => '0.05';
+use constant STUFF_PROG_AUTHOR      => 'Matthew Gates';
 
 use constant ERR_BAD_USAGE => 2;
 use constant ERR_FEED_EXISTS => 3;
 use constant ERR_BAD_CONFIGURATION => 4;
 
 BEGIN {
-	$USER_AGENT = \&STUFF_PROG_DESCRIPTION . "/" . \&STUFF_PROG_VERSION;
-	db_out(1, "$Stuff::Debug::this_script version " . \&STUFF_PROG_VERSION . ", starting");
+	$USER_AGENT = \&STUFF_PROG_DESCRIPTION . '/' . \&STUFF_PROG_VERSION;
+	db_out(1, "$Stuff::Debug::this_script version " . \&STUFF_PROG_VERSION . ', starting');
 }
 
 END {
-	db_out(1, "END");
+	db_out(1, 'END');
 }
 
 my $dbh;
 
 my %gh_get_methods = (
-	'aria2c'   => { 'sub' => "get_with_aria2c",  'order' => 1, },
-	'wget'     => { 'sub' => "get_with_wget",    'order' => 2, },
-	'curl'     => { 'sub' => "get_with_curl",    'order' => 3, },
-	'mpodder'  => { 'sub' => "get_with_mpodder", 'order' => 4, },
+	'aria2c'   => { 'sub' => 'get_with_aria2c',  'order' => 1, },
+	'wget'     => { 'sub' => 'get_with_wget',    'order' => 2, },
+	'curl'     => { 'sub' => 'get_with_curl',    'order' => 3, },
+	'mpodder'  => { 'sub' => 'get_with_mpodder', 'order' => 4, },
 );
 
 my %gh_notify_methods = (
-	'none'        => { 'sub' => "notify_with_none",     'order' => 1, },
-	'notify-send' => { 'sub' => "notify_with_notify",   'order' => 2, },
-	'xmessage'    => { 'sub' => "notify_with_xmessage", 'order' => 3, },
-	'kdialog'     => { 'sub' => "notify_with_kdialog",  'order' => 4, },
-	'mailx'       => { 'sub' => "notify_with_mailx",    'order' => 5, },
+	'none'        => { 'sub' => 'notify_with_none',     'order' => 1, },
+	'notify-send' => { 'sub' => 'notify_with_notify',   'order' => 2, },
+	'xmessage'    => { 'sub' => 'notify_with_xmessage', 'order' => 3, },
+	'kdialog'     => { 'sub' => 'notify_with_kdialog',  'order' => 4, },
+	'mailx'       => { 'sub' => 'notify_with_mailx',    'order' => 5, },
 );
 
 my $gs_config_dir      = $ENV{'HOME'} . "/.mpodder";
@@ -1645,6 +1645,13 @@ sub download_enqueued_items {
 
 	printf "all done (%d ok, %d failed)\n", $dl_ok, $dl_fail;
 	return $dl_ok;
+}
+
+sub parallel_downloader {
+	my @items = @_;
+	# this routine works by generating a Makefile in a temporary directory
+	# the Makefile contains one target per local file name
+	# 
 }
 
 sub nomsan {

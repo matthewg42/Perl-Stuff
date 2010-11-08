@@ -303,15 +303,20 @@ sub host_string {
 
 1;
 
-=head1 LICENSE
-
-Stuff::SpamBL is released under the GNU LGPL.
+__END__
 
 =head1 AUTHOR
 
-Author: Matthew Gates <matthew@porpoisehead.net>
+Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
 
-http://porpoisehead.net/
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2010 by Matthew Gates
+
+This library is released under the terms of the GNU LGPL Version 3, 29 June 2007.
+A copy of this license should have been provided with this software (filename
+LICENSE.LGPL).  The license may also be found at 
+http://www.gnu.org/licenses/lgpl.html
 
 =head1 BUGS
 

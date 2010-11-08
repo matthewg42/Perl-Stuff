@@ -96,4 +96,18 @@ sub equal_to {
 
 1;
 
+=head1 AUTHOR
+
+Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2010 by Matthew Gates
+
+This library is released under the terms of the GNU LGPL Version 3, 29 June 2007.
+A copy of this license should have been provided with this software (filename
+LICENSE.LGPL).  The license may also be found at 
+http://www.gnu.org/licenses/lgpl.html
+
+
 

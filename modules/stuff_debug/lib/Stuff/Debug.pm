@@ -228,15 +228,18 @@ visible.  The 12345 is the PID.
     db_out(-1,"This is a test error", "M");
     # output: 20050210-21:30:02 testprog[12345]/S ERROR[-1]: This is a test error
 
-=head1 LICENSE
-
-Stuff::Debug is released under the GNU LGPL.
-
 =head1 AUTHOR
 
-Author: Matthew Gates <matthew@porpoisehead.net>
+Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
 
-http://porpoisehead.net/
+=head1 COPYRIGHT & LICENSE
+
+Copyright (C) 2010 by Matthew Gates
+
+This library is released under the terms of the GNU LGPL version 3, 29 June 2007.
+A copy of this license should have been provided with this software (filename
+LICENSE.LGPL).  The license may also be found at 
+http://www.gnu.org/licenses/lgpl.html
 
 =head1 BUGS
 
