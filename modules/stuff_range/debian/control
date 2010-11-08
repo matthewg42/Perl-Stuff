@@ -1,0 +1,17 @@
+Source: libstuff-range-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 7), libstuff-debug-perl
+Build-Depends-Indep: perl
+Maintainer: mouse <matthew@porpoisehead.net>
+Standards-Version: 3.8.4
+Homepage: http://search.cpan.org/dist/Stuff-Range/
+
+Package: libstuff-range-perl
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}
+Description: Stuff::Range
+ Stuff::Range is an object module that models simple numeric ranges. Each
+ range has an upper and lower value. Various things may be done to ranges,
+ including checking if a value falls with the range, merging with other
+ Stuff::Ranges, testing if a range is bound by another range and so on.

@@ -100,7 +100,7 @@ sub equal_to {
 
 Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
 
-=head1 COPYRIGHT AND LICENSE
+=head1 COPYRIGHT & LICENSE
 
 Copyright (C) 2010 by Matthew Gates
 

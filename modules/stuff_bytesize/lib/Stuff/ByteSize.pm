@@ -14,7 +14,7 @@ Stuff::ByteSize - convert numbers to n-byte sizes (e.g. KiB)
 =head1 DESCRIPTION
 
 Here you can convert from a [possibly very large] number of bytes into
-some more managable unit such as Gigi-bytes.  Well, almomst.  Many
+some more managable unit such as Gigi-bytes.  Well, almost.  Many
 programmers are guilty of doing the calculation incorrrectly, and
 almost all don't use the proper nomenclature.
 
@@ -131,7 +131,7 @@ __END__
 
 Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
 
-=head1 COPYRIGHT AND LICENSE
+=head1 COPYRIGHT & LICENSE
 
 Copyright (C) 2010 by Matthew Gates
 

@@ -10,7 +10,7 @@ Stuff::Chart - base class for ASCII charts
 
 =head1 DESCRIPTION
 
-Stuff::Chart is an object module that contains the ganeric chart
+Stuff::Chart is an object module that contains the generic chart
 options that are extended in modules such as Stuff::HBarChart.  It
 will probably never be needed by the end user, unless they want to
 write their own chart style.
@@ -62,7 +62,7 @@ __END__
 
 Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
 
-=head1 COPYRIGHT AND LICENSE
+=head1 COPYRIGHT & LICENSE
 
 Copyright (C) 2010 by Matthew Gates
 
@@ -70,5 +70,11 @@ This library is released under the terms of the GNU LGPL Version 3, 29 June 2007
 A copy of this license should have been provided with this software (filename
 LICENSE.LGPL).  The license may also be found at 
 http://www.gnu.org/licenses/lgpl.html
+
+=head1 BUGS
+
+Reports to the author please.
+
+=head1 SEE ALSO
 
 =cut

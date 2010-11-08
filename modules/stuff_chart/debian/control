@@ -1,0 +1,16 @@
+Source: libstuff-chart-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 7), libstuff-debug-perl
+Build-Depends-Indep: perl
+Maintainer: mouse <matthew@porpoisehead.net>
+Standards-Version: 3.8.4
+Homepage: http://search.cpan.org/dist/Stuff-Chart/
+
+Package: libstuff-chart-perl
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}
+Description: base class for ASCII charts
+ Stuff::Chart is an object module that contains the generic chart options that
+ are extended in modules such as Stuff::HBarChart. It will probably never be
+ needed by the end user, unless they want to write their own chart style.
