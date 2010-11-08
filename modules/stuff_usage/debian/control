@@ -5,7 +5,7 @@ Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: perl
 Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
-Homepage: https://launchpad.net/stufftools/
+Homepage: http://search.cpan.org/dist/Stuff-Usage/
 
 Package: libstuff-usage-perl
 Architecture: all

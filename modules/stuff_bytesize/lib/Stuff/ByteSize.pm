@@ -29,17 +29,16 @@ So now you know!
 
 require Exporter;
 
-@ISA=qw(Exporter);
-@EXPORT     = qw (&bytes2sz);
+@ISA        = qw(Exporter);
+@EXPORT     = qw(&bytes2sz);
 @EXPORT_OK  = qw();
 
 use strict;
 use Stuff::Debug;
 
-use constant STUFF_MODULE_VERSION => "0.02";
-
 BEGIN {
-    db_out(5, "Stuff::ByteSize version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.03';
+    db_out(5, "Stuff::ByteSize version $VERSION", "M");
 }
 
 =head1 FUNCTIONS

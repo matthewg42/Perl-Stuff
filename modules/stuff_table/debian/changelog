@@ -1,5 +1,5 @@
-libstuff-table-perl (0-1) unstable; urgency=low
+libstuff-table-perl (0.03-1) maverick; urgency=low
 
   * Initial Release.
 
- -- Matthew Gates <matthew@porpoisehead.net>  Mon, 8 Nov 2010 14:37:17 +0000
+ -- mouse <matthew@porpoisehead.net>  Mon, 8 Nov 2010 18:49:55 +0000

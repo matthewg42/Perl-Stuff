@@ -48,10 +48,9 @@ use strict;
 use vars qw(@temp_files $temp_dir $tempfile_prefix $tempfile_tries);
 use Stuff::Debug qw(db_out);
 
-use constant STUFF_MODULE_VERSION => "0.02";
-
 BEGIN {
-    db_out(5, "Stuff::Mktemp version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.03';
+    db_out(5, "Stuff::Mktemp version $VERSION", "M");
 
     @temp_files = ();
     if ( defined($ENV{TMP}) ) {

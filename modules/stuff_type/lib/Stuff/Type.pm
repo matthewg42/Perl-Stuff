@@ -22,10 +22,9 @@ use overload ('+'  => "add",
 	      '>=' => "greater_than_or_equal_to",
 	      '<=' => "less_than_or_equal_to");
 
-use constant STUFF_MODULE_VERSION => "0.02";
-
 BEGIN {
-    db_out(5, "Stuff::Type version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.03';
+    db_out(5, "Stuff::Type version $VERSION", "M");
     use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $null_desc);
 
     @ISA         = qw(Exporter);

@@ -7,7 +7,7 @@ Maintainer: Matthew Gates <matthew@porpoisehead.net>
 Standards-Version: 3.8.4
 Homepage: https://launchpad.net/stufftools
 
-Package: libstuff-chart-perl
+Package: mpodder
 Architecture: all
 Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl,
  libstuff-usage-perl, libstuff-text-perl, libstuff-table-perl,
@@ -15,4 +15,5 @@ Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl,
 Suggests: libnotify-bin
 Description: Command line podcatcher along the same lines as hpodder
  mpodder aims to be a flexible and convenient to use podcatcher.
+ mpodder uses sqlite3 as a back end to store podcast details.
 

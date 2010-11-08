@@ -33,10 +33,10 @@ use strict;
 use File::Basename;
 use Stuff::Debug qw(&db_out $this_script);
 use Stuff::Text qw(&delimit_data);
-use constant STUFF_MODULE_VERSION => "0.01";
 
 BEGIN {
-    db_out(5, "Stuff::ByteSize version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.02';
+    db_out(5, "Stuff::ByteSize version $VERSION", "M");
 }
 
 =head2 relative_path(I<$masterpath>, I<$linkpath>)

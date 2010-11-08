@@ -11,6 +11,9 @@ foreach my $f (@ARGV) {
 	open(NEW, ">$f") || die "cannot open new file for writing: $f";
 
 	while(<OLD>) {
+		if ( /^Source:/ ) {
+			$_ = "Source: https://launchpad.net/stufftools/\n";
+		}
 		if ( /^Name:/ ) {
 			print NEW $_;
 			print NEW new_copyright() . "\n";

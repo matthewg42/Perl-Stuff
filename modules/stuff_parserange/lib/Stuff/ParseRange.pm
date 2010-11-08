@@ -44,15 +44,13 @@ use Carp;
 use vars qw($max_value $min_value);
 use Stuff::Debug qw(db_out);
 use Stuff::Range;
-use constant STUFF_MODULE_VERSION => "0.01";
 
 BEGIN {
-    db_out(5, "Stuff::ParseRange version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.02';
+    db_out(5, "Stuff::ParseRange version $VERSION", "M");
 
     $min_value = -999999999;
     $max_value = 999999999;
-
-    db_out(5,"Stuff::ParseRange::BEGIN: version is $VERSION","M");
 }
 
 =head2 new(I<rangestring>)

@@ -45,10 +45,10 @@ use vars qw(%dialect_aliases %dialect_abbrev $dialect %morse_char_data
 use File::Basename;
 use Text::Abbrev;
 use Stuff::Debug qw(db_out);
-use constant STUFF_MODULE_VERSION => "0.01";
 
 BEGIN {
-    db_out(5, "Stuff::Morse version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.02';
+    db_out(5, "Stuff::Morse version $VERSION", "M");
 
     %dialect_aliases = (
 			"international" => "international",

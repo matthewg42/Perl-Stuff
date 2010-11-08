@@ -1,25 +1,11 @@
 #!/usr/bin/perl
 ###############################################################################
 # mpodder - a slightly more sophisticated command line podcast client.
-# http://www.porpoisehead.net/mysw/index.php?pgid=mpodder
+# https://launchpad.net/stufftools
 #
-# Copyright (C) 2005, 2010, Matthew Gates <matthewg42@gmail.com>
+# Copyright (C) 2005, 2010, Matthew Gates <matthew@porpoisegead.net>
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-# 02111-1307, USA.
-# or visit: http://www.gnu.org/licenses/gpl.txt
+# See Section "COPYRIGHT & LICENSE" below for licensing information
 ###############################################################################
 
 
@@ -362,10 +348,11 @@ package main;
 ###############################################################################
 
 use strict;
+use warnings;
 use Getopt::Long;
 use vars qw($USER_AGENT);
 use Stuff::Debug qw(db_out);
-use Stuff::Usage qw(usage long_usage version_message);
+use Stuff::Usage qw(usage full_usage version_message);
 use Stuff::Text qw(delimit_data);
 use Stuff::Table;
 use Text::Abbrev;
@@ -523,7 +510,7 @@ GetOptions(
 	   'debug=i'       => \$Stuff::Debug::debug_level{'S'},
 	   'directory=s'   => \$gs_flg_podcast_dir,
 	   'force'         => \$gs_force,
-	   'help'          => sub { long_usage(0) },
+	   'help'          => sub { full_usage(0); },
            'interactive'   => \$gs_flg_interactive,
            'leave=i'       => \$gs_flg_leave,
            'parallel=i'    => \$gs_flg_parallel,
@@ -531,7 +518,7 @@ GetOptions(
            'strict-ids'    => \$gs_flg_strict_ids,
            'url'           => \$gs_flg_url,
 	   'verbose'       => \$gs_flg_verbose,
-	   'version'       => sub { version_message() },
+	   'version'       => sub { version_message(); exit 0; },
 ) or usage(ERR_BAD_USAGE);
 
 # Would have done this when making %gh_config above, but then we would miss out on 
@@ -2317,7 +2304,7 @@ Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright (C) 2010 by Matthew Gates
+Copyright (C) 2005, 2010 by Matthew Gates
 
 This program is released under the terms of the GNU GPL Version 3, 29 June 2007.
 A copy of this license should have been provided with this software (filename

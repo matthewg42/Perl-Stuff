@@ -24,16 +24,16 @@ use Stuff::Debug qw(db_out);
 # two FieldSets are of compatable type (for union operators and the like)
 # It should IGNORE fieldnames.
 use overload ('==' => "equal_to");
-use constant STUFF_MODULE_VERSION => "0.01";
 
 BEGIN {
+    $VERSION = '0.02';
     use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
     @ISA         = qw(Exporter);
     @EXPORT      = qw();
     %EXPORT_TAGS = qw();
     @EXPORT_OK   = qw($null_desc &isa_stuff_type);
 
-    db_out(5, "Stuff::FieldSet version " . &STUFF_MODULE_VERSION, "M");
+    db_out(5, "Stuff::FieldSet version $VERSION", "M");
     return 1;
 }
 

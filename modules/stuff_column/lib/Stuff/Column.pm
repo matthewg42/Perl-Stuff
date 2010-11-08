@@ -60,10 +60,9 @@ use strict;
 use Carp;
 use Stuff::Debug qw(db_out);
 
-use constant STUFF_MODULE_VERSION => "0.02";
-
 BEGIN {
-    db_out(5, "Stuff::Column version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.03';
+    db_out(5, "Stuff::Column version $VERSION", "M");
 }
 
 =head2 new(%properties)

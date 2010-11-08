@@ -4,13 +4,13 @@ package Stuff::Usage;
 
 =head1 SYNOPSIS
 
-    use Stuff::Usage qw(&usage &long_usage);
+ use Stuff::Usage qw(&usage &long_usage &full_usage);
 
-    if ( $verbose ) {
-        long_usage($error_level);
-    else {
-        usage($error_level);
-    }
+ full_usage($error_lebel);
+ long_usage($error_level);
+ usage($error_level);
+
+ version_message();
 
 =head1 DESCRIPTION
 
@@ -27,15 +27,15 @@ require Exporter;
 
 @ISA        = qw(Exporter);
 @EXPORT     = qw ();
-@EXPORT_OK  = qw(&usage &long_usage &version_message);
+@EXPORT_OK  = qw(&usage &long_usage &full_usage &version_message);
 
 use strict;
 use File::Basename;
 use Stuff::Debug qw(db_out $this_script);
-use constant STUFF_MODULE_VERSION => "0.02";
 
 BEGIN {
-    db_out(5, "Stuff::Usage version " . &STUFF_MODULE_VERSION, "M");
+    $VERSION = '0.03';
+    db_out(5, "Stuff::Usage version $VERSION", "M");
 }
 
 =head2 usage(I<$lev>)
@@ -71,16 +71,39 @@ sub usage {
     exit($level);
 }
 
-=head2 usage(I<$lev>)
+=head2 long_usage(I<$lev>)
 
-Prints a fairly brief usage message.  The message is the output of
-pod2usage --verbose 1 for the program file that is currently
-executing.
+Prints a longer usage message including command line option details.  
+The message is the output of "pod2usage --verbose 1" for the program
+file that is currently executing.  Once usage output is complete,
+the program exits with status I<$lev>.
 
 =cut
 
 sub long_usage {
     my $level = shift;
+    pod2usage_out($level, 1);
+}
+
+=head2 full_usage(I<$lev>)
+
+Prints a full manual page to standard output.  The output is that of
+"pod2usage --verbose 3" for the program file that is currently 
+executing.  Once usage output is complete, the program exits with 
+status I<$lev>.  long_usage is generally recommened for the output of
+a B<--help> command line option, but sometimes that's not enough, and
+this function is better.
+
+=cut
+
+sub full_usage {
+    my $level = shift;
+    pod2usage_out($level, 3);
+}
+
+sub pod2usage_out {
+    my $level = shift;
+    my $verbosity = shift || 1;
 
     if ( ! defined( $level) ) {
 	$level = 0;
@@ -89,12 +112,12 @@ sub long_usage {
 	die "argument must be integer";
     }
 
-    db_out(6, "Stuff::Usage::long_usage: level = $level", "M");
+    db_out(6, "Stuff::Usage::pod2usage_out: level = $level, verbosity = $verbosity", "M");
 
     # open this_script and extract POD documentation.
-    my $cmd = "pod2usage -verbose 1 $this_script";
+    my $cmd = "pod2usage -verbose $verbosity $this_script";
 
-    db_out(6, "Stuff::Usage::long_usage: command is $cmd", "M");
+    db_out(6, "Stuff::Usage::pod2usage_out: command is $cmd", "M");
 
     open(THISSCRIPT, "$cmd|") || die "error executing $cmd: $!";
 
@@ -104,6 +127,14 @@ sub long_usage {
 
     exit($level);
 }
+
+=head2 usage(I<$lev>)
+
+Prints a fairly brief usage message.  The message is the output of
+pod2usage --verbose 1 for the program file that is currently
+executing.
+
+=cut
 
 =head2 version_message()
 

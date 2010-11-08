@@ -68,12 +68,12 @@ use POSIX;
 @EXPORT_OK  = qw(%debug_level $debug_handle $debug_timefmt $this_script);
 
 use strict;
-use vars qw(%debug_level $debug_handle $debug_timefmt $this_script $VERSION);
+use vars qw(%debug_level $debug_handle $debug_timefmt $this_script);
 use File::Basename;
 
-use constant STUFF_MODULE_VERSION => 0.02;
-
 BEGIN {
+    $VERSION = '0.03';
+
     # set this to undef to omit time from debug message.  This will save a 
     # few processor cycles so it might be good if you have very verbose 
     # debugging output
@@ -107,7 +107,7 @@ BEGIN {
         if ( defined( $debug_timefmt ) ) {
 	    $timestr = strftime($debug_timefmt, (localtime(time)) ) . " ";
         }
-	    printf $debug_handle "%s%s[%d]/%s %s: %s\n", $timestr, $this_script, $$, "M", "DEBUG[5]", "Stuff::Debug::BEGIN: version is " . &STUFF_MODULE_VERSION;
+	    printf $debug_handle "%s%s[%d]/%s %s: %s\n", $timestr, $this_script, $$, "M", "DEBUG[5]", "Stuff::Debug::BEGIN: version is $VERSION";
         }
 
     return 0;
