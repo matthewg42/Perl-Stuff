@@ -98,7 +98,7 @@ sub pending_download {
 		return 0;
 	}
 
-	# ok it hasn't been listsned to already.
+	# ok it hasn't been listened to already.
 	# lets see if there is a copy of the file on the filesystem
 
 	my $local_path = main::get_podcast_dir() . "/" . $self->get_local_path();
@@ -262,7 +262,16 @@ sub update {
 	# get the items if they're not already gotten
 	$self->get_items();
 	
-	my $rss = XML::Feed->parse(URI->new($self->{'url'})) || die "PodCastFeed: " . XML::Feed->errstr;
+	my $rss;
+
+	eval {
+		$rss = XML::Feed->parse(URI->new($self->{'url'})) || die "PodCastFeed: " . XML::Feed->errstr;
+	};
+	if ($@) {
+		main::db_out(-1, "PodCastFeed.update: cannot get feed url: " . XML::Feed->errstr);
+		return 0;
+	}
+
 	foreach my $entry ($rss->entries) {
 		my ($ep_media_url);
 		my $enc;
@@ -483,7 +492,13 @@ my @ga_schema_objects = (
 	media_length	INTEGER,
 	media_type	VARCHAR(256),
 	listened	INTEGER
-);",
+);
+CREATE TABLE settings ( 
+	key		VARCHAR(128),
+	value		VARCHAR(256)
+);
+INSERT INTO settings (key, value) VALUES ('mpodder_version', '" . &STUFF_PROG_VERSION . "');
+",
 );
 
 # Script scope variables that will be used to store settings.
@@ -709,14 +724,14 @@ sub mpodder_list {
 	foreach my $f (@feeds) {
 		my @episodes = $f->get_items();
 		my $last_ep_date = undef;
-		my $edownloaded = 0;
+		my $e_is_local = 0;
 		my $eunlistened = 0;
 		my $etotal = 0;
 		foreach my $ep (@episodes) {
 			if (($ep->{'pub_date'}||0) > ($last_ep_date||0)) {
 				$last_ep_date = $ep->{'pub_date'};
 			}
-			if ($ep->local_file_exists()) { $edownloaded++; }
+			if ($ep->local_file_exists()) { $e_is_local++; }
 			elsif (($ep->{'listened'} || 0) == 0) { $eunlistened++; }
 			$etotal++;
 		}
@@ -724,7 +739,7 @@ sub mpodder_list {
 		print $t->array_row($f->{'id'},
 		                    $f->{'title'} || '<no title>',
 		                    defined($last_ep_date) ? DateTime->from_epoch('epoch' => $last_ep_date)->strftime("%Y-%m-%d %T") : "-",
-		                    $edownloaded, 
+		                    $e_is_local, 
 		                    $eunlistened, 
 		                    $etotal);
 	}
@@ -788,6 +803,7 @@ sub mpodder_elist {
 	$t->add_column('name' => 'FID', 'format' => 'd', 'width' => 3, 'align' => 'right');
 	$t->add_column('name' => 'Feed Title', 'format' => 's', 'width' => ($ftitle_w > 10 ? $ftitle_w : 10));
 	$t->add_column('name' => 'Episode Title', 'format' => 's', 'width' => ($etitle_w > 13 ? $etitle_w : 13));
+	$t->add_column('name' => 'Date Published', 'format' => 's', 'width' => 20);
 	$t->add_column('name' => 'Episode Location', 'format' => 's', 'width' => ($url_w > 11 ? $url_w : 11));
 	$t->add_column('name' => 'LIS', 'format' => 's');
 	$t->add_column('name' => 'DLD', 'format' => 's');
@@ -803,6 +819,7 @@ sub mpodder_elist {
 						    $i->{'feed_id'},
 						    $f->{'title'},
 						    $i->{'title'},
+				                    defined($i->{'pub_date'}) ? DateTime->from_epoch('epoch' => $i->{'pub_date'})->strftime("%Y-%m-%d %T") : "-",
 						    $i->get_episode_location(),
 						    $i->{'listened'} ? "yes" : "no",
 						    $i->local_file_exists() ? "yes" : "no");
@@ -1033,7 +1050,7 @@ sub mpodder_download {
 
 	my @items_to_download;
 	foreach my $f (@feeds) {
-		printf "Downloading feed %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		# printf "Downloading feed %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
 		my $count = 0;
 		foreach my $i ($f->get_items()) {
 			if ($i->pending_download()) {
@@ -1042,11 +1059,12 @@ sub mpodder_download {
 			}
 		}
 
-		printf "queued %d items for download\n", $count if ($gs_flg_verbose);
+		printf "queued %d items for download\n", $count if ($gs_flg_verbose && $count > 0);
 	}
 
 	print "\n" if ($gs_flg_verbose);
-	printf "Total %d feed ready for download\n", $#items_to_download + 1 if ($gs_flg_verbose);
+	my $ci = $#items_to_download + 1;
+	printf("Total %d %s ready for download\n", $ci, $ci == 1 ? "item" : "items") if ($gs_flg_verbose);
 
 	download_enqueued_items(@items_to_download);
 }
