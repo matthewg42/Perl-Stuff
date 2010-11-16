@@ -380,7 +380,7 @@ use XML::Feed::Enclosure;
 
 use constant STUFF_PROG_DESCRIPTION => 'mpodder';
 use constant STUFF_PROG_COPYRIGHT   => '(C) 2010; released under the GNU GPL version 3';
-use constant STUFF_PROG_VERSION     => '0.05';
+use constant STUFF_PROG_VERSION     => '0.06';
 use constant STUFF_PROG_AUTHOR      => 'Matthew Gates';
 
 use constant ERR_BAD_USAGE => 2;
@@ -503,10 +503,8 @@ INSERT INTO settings (key, value) VALUES ('mpodder_version', '" . &STUFF_PROG_VE
 
 # Script scope variables that will be used to store settings.
 my $gs_flg_age         = 0;
-my $gs_flg_pretend     = 0;
 my $gs_flg_deleted     = 0;
 my $gs_flg_verbose     = 0;
-my $gs_flg_interactive = 0;
 my $gs_flg_podcast_dir = $ENV{'HOME'} . "/podcasts";
 my $gs_config_file     = "$gs_config_dir/config";
 my $gs_force           = 0;
@@ -526,10 +524,8 @@ GetOptions(
 	   'directory=s'   => \$gs_flg_podcast_dir,
 	   'force'         => \$gs_force,
 	   'help'          => sub { full_usage(0); },
-           'interactive'   => \$gs_flg_interactive,
            'leave=i'       => \$gs_flg_leave,
            'parallel=i'    => \$gs_flg_parallel,
-	   'pretend'       => \$gs_flg_pretend,
            'strict-ids'    => \$gs_flg_strict_ids,
            'url'           => \$gs_flg_url,
 	   'verbose'       => \$gs_flg_verbose,
@@ -560,6 +556,7 @@ my %gh_command_subs = (
 		       'update'    => \&mpodder_update,
 		       'download'  => \&mpodder_download,
 		       'dl'        => \&mpodder_download,
+                       'fetch'     => \&mpodder_fetch,
 		       'catchup'   => \&mpodder_catchup,
 );
 my %gh_command_abbrevs    = abbrev keys %gh_command_subs;
@@ -586,9 +583,7 @@ $SIG{'TERM'} = "interrupt_trap";
 
 # OK, call it...
 db_out(1, "going to call command " . $gh_command_abbrevs{$gs_command} . "(" . join(",", @ga_command_parameters) . ")");
-$gh_command_subs{ $gh_command_abbrevs{$gs_command} }(@ga_command_parameters);
-
-exit 0;
+exit $gh_command_subs{ $gh_command_abbrevs{$gs_command} }(@ga_command_parameters);
 
 #########################################################################
 # Subroutines
@@ -620,7 +615,7 @@ sub mpodder_configure {
 
 	save_config_file();
 
-	exit 0;
+	return 0;
 }
 
 sub mpodder_interactive_config {
@@ -669,7 +664,7 @@ sub mpodder_interactive_config {
 		}
 	}
 
-	exit 0;
+	return 0;
 }
 
 sub mpodder_dump_settings {
@@ -686,7 +681,7 @@ sub mpodder_dump_settings {
 		print "  $f\n";
 	}
 
-	exit 0;
+	return 0;
 }
 
 sub mpodder_list {
@@ -701,7 +696,7 @@ sub mpodder_list {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n");
-		exit 0;
+		return 0;
 	}
 
 	my $title_w = 0;
@@ -775,7 +770,7 @@ sub mpodder_elist {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n");
-		exit 0;
+		return 0;
 	}
 
 	my $ftitle_w = 0;
@@ -850,7 +845,7 @@ sub mpodder_add {
 
 	if (db_feed_exists($url)) {
 		db_out(0, "mpodder_add: not adding because feed already exists with url $url");
-		exit ERR_FEED_EXISTS;
+		return ERR_FEED_EXISTS;
 	}
 
 	print "Adding feed... " if ($gs_flg_verbose);
@@ -886,7 +881,7 @@ sub mpodder_update {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n");
-		exit 0;
+		return 0;
 	}
 
 	foreach my $f (@feeds) {
@@ -909,7 +904,7 @@ sub mpodder_delete {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
-		exit 0;
+		return 0;
 	}
 
 	foreach my $f (@feeds) {
@@ -933,7 +928,7 @@ sub mpodder_undelete {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
-		exit 0;
+		return 0;
 	}
 
 	foreach my $f (@feeds) {
@@ -957,7 +952,7 @@ sub mpodder_purge {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
-		exit 0;
+		return 0;
 	}
 
 	foreach my $f (@feeds) {
@@ -989,7 +984,7 @@ sub mpodder_reset {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
-		exit 0;
+		return 0;
 	}
 
 	foreach my $f (@feeds) {
@@ -1014,7 +1009,7 @@ sub mpodder_catchup {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
-		exit 0;
+		return 0;
 	}
 
 	foreach my $f (@feeds) {
@@ -1045,7 +1040,7 @@ sub mpodder_download {
 
 	if ($#feeds < 0) {
 		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
-		exit 0;
+		return 0;
 	}
 
 	my @items_to_download;
@@ -1067,6 +1062,13 @@ sub mpodder_download {
 	printf("Total %d %s ready for download\n", $ci, $ci == 1 ? "item" : "items") if ($gs_flg_verbose);
 
 	download_enqueued_items(@items_to_download);
+}
+
+sub mpodder_fetch {
+	my $retval = 0;
+	$retval += mpodder_update(@_);
+	$retval += mpodder_download(@_);
+	return $retval;
 }
 
 #########################################################################
@@ -1780,30 +1782,21 @@ sub notify_fetched {
 		return;
 	}
 
-	if ($gs_flg_pretend) {
-		print "would use notification method: " . $gh_config{'NOTIFY'}{'VALUE'};
-		if ($gh_config{'NOTIFY'}{'VALUE'} eq "mail") {
-			print " to email address: " . $gh_config{'NOTIFY_ADDRESS'}{'VALUE'};
-		}
-		print "\nNotification is: $message";
+	if ($gh_config{'NOTIFY'}{'VALUE'} eq "mail") {
+	}
+	elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "kdialog") {
+		my $cmd = "kdialog --msgbox \"$message\"";
+		system $cmd;
+	}
+	elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "xmessage") {
+		my $cmd = "xmessage \"$message\"";
+		system $cmd;
+	}
+	elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "none") {
+		db_out(5, "notify_address: OK, no notification requested, not sending one");
 	}
 	else {
-		if ($gh_config{'NOTIFY'}{'VALUE'} eq "mail") {
-		}
-		elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "kdialog") {
-			my $cmd = "kdialog --msgbox \"$message\"";
-			system $cmd;
-		}
-		elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "xmessage") {
-			my $cmd = "xmessage \"$message\"";
-			system $cmd;
-		}
-		elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "none") {
-			db_out(5, "notify_address: OK, no notification requested, not sending one");
-		}
-		else {
-			db_out(0, "notify_address: notification method \"" . $gh_config{'NOTIFY'}{'VALUE'} . "\" is not understood.  If you don't want a notification method, use \"none\"");
-		}
+		db_out(0, "notify_address: notification method \"" . $gh_config{'NOTIFY'}{'VALUE'} . "\" is not understood.  If you don't want a notification method, use \"none\"");
 	}
 }
 
@@ -2141,6 +2134,25 @@ and the title taken from it.
 
 B<new> is an alias for B<add>.
 
+=item B<catchup> [I<filters>]
+
+This command causes all feeds (filtered by I<filter> if specified) to
+be brought up to date as if all casts had been downloaded.  The casts
+are not actually downloaded, but are flagged in the log as if they
+were.  It's a good way to prevent a busy feed from downloading loads
+of old stuff that you're not interested in.  It's the podcast
+equivalent of returning to the office after vacation, and selecting
+"mark all messages as read" in your mail client... ;)
+
+If the B<--leave>=I<n> option is used, I<n> podcasts are left as 
+not-listened, and will be downloaded in subsequent B<download> commands.
+
+=item B<configure> I<option=value>
+
+If no parameter to the command is supplied, mpodder enters an
+interactive configuration mode.  If a I<option=value> parameter is
+passed, that parameter is updated in the configuration file.
+
 =item B<delete> I<filters>
 
 Removes a feed or feeds from the feed list.  A I<filter> must be
@@ -2163,13 +2175,19 @@ Note that downloaded episodes are not deleted until a feed is purged.
 
 B<remove> and B<rm> are aliases for B<delete>.
 
-=item B<undelete> I<filters>
+=item B<download> [I<filters>]
 
-Looks at deleted podcasts and undeltes them.  If a filter argument is
-provided than only feeds matching the filter are undelted.  The undelete
-filters work the same as the B<list> command filters, so you can preview
-what would be undeleted by using the same filter as an argument to 
-B<list> with the B<--deleted> option.
+The B<download> command checks each feed matching I<filters> and 
+downloads the media files for any new episodes which do not exist
+locally.  Once an item is downloaded, it is marked as "listened".
+
+See also: B<fetch> command.
+
+=item B<fetch> [I<filters>]
+
+The B<fetch> command runs the update and download commands in order.
+
+See also: B<update> and B<download> commands.
 
 =item B<purge>
 
@@ -2179,24 +2197,23 @@ any downloaded episodes for the specified feed(s).
 
 B<nuke> is an alias for B<purge>.
 
-=item B<configure> I<option=value>
+=item B<undelete> I<filters>
 
-If no parameter to the command is supplied, mpodder enters an
-interactive configuration mode.  If a I<option=value> parameter is
-passed, that parameter is updated in the configuration file.
+Looks at deleted podcasts and undeltes them.  If a filter argument is
+provided than only feeds matching the filter are undelted.  The undelete
+filters work the same as the B<list> command filters, so you can preview
+what would be undeleted by using the same filter as an argument to 
+B<list> with the B<--deleted> option.
 
-=item B<catchup> [I<filters>]
+=item B<update> [I<filters>]
 
-This command causes all feeds (filtered by I<filter> if specified) to
-be brought up to date as if all casts had been downloaded.  The casts
-are not actually downloaded, but are flagged in the log as if they
-were.  It's a good way to prevent a busy feed from downloading loads
-of old stuff that you're not interested in.  It's the podcast
-equivalent of returning to the office after vacation, and selecting
-"mark all messages as read" in your mail client... ;)
+This command makes mpodder check feeds which match I<filters> for new 
+episodes.  If the B<--verbose> option is used, a line of output is 
+printed as each feed is checked and the number of new episodes found 
+is printed once the feed base been updated.  Note that no media is
+downloaded during the B<update> command.  
 
-If the B<--leave>=I<n> option is used, I<n> podcasts are left as 
-not-listened, and will be downloaded in subsequent B<download> commands.
+See also: B<fetch> command.
 
 =back
 
@@ -2229,18 +2246,6 @@ Dumps the settings found in the configuration file and exists.
 =item B<--help>
 
 Print the command line syntax an option details.
-
-=item B<--interactive>
-
-For operations which modify the database (e.g. remove, fetch), the user will
-be prompted before each write operation.  For example, when using the remove
-command, the user will be prompted before removing each feed.
-
-=item B<--pretend>
-
-Pretend mode.  When the command is B<fetch> and this option is
-specified, downloads are not performed, instead a list of what would
-be downloaded is printed.
 
 =item B<--strict-ids>
 
@@ -2344,13 +2349,16 @@ LICENSE).  The license may also be found at http://www.gnu.org/licenses/gpl.html
 
 Please report bugs to the author.
 
-TODO: add disabled mode so a feed can be excluded from the check list
+=head1 POSSIBLE FUTURE FEATURES
 
-TODO: feed schedules (i.e. per-feed check / download frequency)
+=over
 
-TODO: reimplement -i & -p flag for refactored code
+=item feed schedules 
 
-TODO: list episodes inc only available and paths to local files only
+Feed specific periods of time to check for new episodes (e.g. daily, 
+weekly, monthly).
+
+=item OPML import & export
 
 =head1 SEE ALSO
 
