@@ -1050,11 +1050,10 @@ sub mpodder_download {
 		foreach my $i ($f->get_items()) {
 			if ($i->pending_download()) {
 				push @items_to_download, $i;
+				printf "Queued for download: %-30s / %s\n", substr($f->{'title'}, 0, 29), $i->{'title'};
 				$count++;
 			}
 		}
-
-		printf "queued %d items for download\n", $count if ($gs_flg_verbose && $count > 0);
 	}
 
 	print "\n" if ($gs_flg_verbose);
