@@ -1,0 +1,2 @@
+version=3
+http://search.cpan.org/dist/Stuff-Daemon/   .*/Stuff-Daemon-v?(\d[\d.-]+)\.(?:tar(?:\.gz|\.bz2)?|tgz|zip)$
