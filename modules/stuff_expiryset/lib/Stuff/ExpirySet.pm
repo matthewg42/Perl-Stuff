@@ -2,7 +2,7 @@ package Stuff::ExpirySet;
 
 =head1 NAME 
 
-Stuff::ExpirySet
+Stuff::ExpirySet - container with expiry time for objects
 
 =head1 SYNOPSIS
 
