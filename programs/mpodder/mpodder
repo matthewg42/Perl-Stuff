@@ -512,24 +512,26 @@ my $gs_flg_leave       = 0;
 my $gs_flg_strict_ids  = 0;
 my $gs_flg_parallel    = 1;
 my $gs_flg_url         = 0;
+my $gs_flg_only_ready  = 0;
 my $gs_flg_display_all = 0;
 
 # Parse command line options.  Love GetOptions:
 GetOptions(
-           'all'           => \$gs_flg_display_all,
-	   'age=i'         => \$gs_flg_age,
-	   'config-file=s' => \$gs_config_file,
-           'deleted'       => \$gs_flg_deleted,
-	   'debug=i'       => \$Stuff::Debug::debug_level{'S'},
-	   'directory=s'   => \$gs_flg_podcast_dir,
-	   'force'         => \$gs_force,
-	   'help'          => sub { full_usage(0); },
-           'leave=i'       => \$gs_flg_leave,
-           'parallel=i'    => \$gs_flg_parallel,
-           'strict-ids'    => \$gs_flg_strict_ids,
-           'url'           => \$gs_flg_url,
-	   'verbose'       => \$gs_flg_verbose,
-	   'version'       => sub { version_message(); exit 0; },
+           'all'            => \$gs_flg_display_all,
+	   'age=i'          => \$gs_flg_age,
+	   'config-file=s'  => \$gs_config_file,
+           'deleted'        => \$gs_flg_deleted,
+	   'debug=i'        => \$Stuff::Debug::debug_level{'S'},
+	   'directory=s'    => \$gs_flg_podcast_dir,
+	   'force'          => \$gs_force,
+	   'help'           => sub { full_usage(0); },
+           'leave=i'        => \$gs_flg_leave,
+	   'only-ready'     => \$gs_flg_only_ready,
+           'parallel=i'     => \$gs_flg_parallel,
+           'strict-ids'     => \$gs_flg_strict_ids,
+           'url'            => \$gs_flg_url,
+	   'verbose'        => \$gs_flg_verbose,
+	   'version'        => sub { version_message(); exit 0; },
 ) or usage(ERR_BAD_USAGE);
 
 # Would have done this when making %gh_config above, but then we would miss out on 
@@ -716,6 +718,7 @@ sub mpodder_list {
 	print $t->title_str();
 	print $t->underline_str();
 
+	my $printed_count = 0;
 	foreach my $f (@feeds) {
 		my @episodes = $f->get_items();
 		my $last_ep_date = undef;
@@ -731,16 +734,20 @@ sub mpodder_list {
 			$etotal++;
 		}
 		
-		print $t->array_row($f->{'id'},
-		                    $f->{'title'} || '<no title>',
-		                    defined($last_ep_date) ? DateTime->from_epoch('epoch' => $last_ep_date)->strftime("%Y-%m-%d %T") : "-",
-		                    $e_is_local, 
-		                    $eunlistened, 
-		                    $etotal);
+		if (($gs_flg_only_ready && $eunlistened) || !$gs_flg_only_ready)
+		{
+			$printed_count++;
+			print $t->array_row($f->{'id'},
+					    $f->{'title'} || '<no title>',
+					    defined($last_ep_date) ? DateTime->from_epoch('epoch' => $last_ep_date)->strftime("%Y-%m-%d %T") : "-",
+					    $e_is_local, 
+					    $eunlistened, 
+					    $etotal);
+		}
 	}
 	print "\n";
 
-	printf "%d%s feeds %s\n", ($#feeds+1), 
+	printf "%d%s feeds %s\n", $printed_count, 
 	                          ($gs_flg_deleted ? " deleted" : ""),
 	                          ($#filters < 0) ? "found" : "matching specified filters";
 
@@ -1018,10 +1025,17 @@ sub mpodder_catchup {
 		# TODO because we can clean up the in-memory cached items that way.
 		my $icount = 0;
 		my @items = sort { $b->pdate() <=> $a->pdate() } $f->get_items();
-		for (my $i=$gs_flg_leave; $i <= $#items; $i++) {
-			$items[$i]->{'listened'} = 1;
+		for (my $i=0; $i<$gs_flg_leave; $i++) {
+			$items[$i]->{'listened'} = 0;
 			$items[$i]->save();
-			$icount++;
+		}
+		for (my $i=$gs_flg_leave; $i <= $#items; $i++) {
+			if (($items[$i]->{'listened'} || 0) == 0)
+			{
+				$items[$i]->{'listened'} = 1;
+				$items[$i]->save();
+				$icount++;
+			}
 		}
 		printf "%d %s marked as listened\n", $icount, $icount == 1 ? "item" : "items" if ($gs_flg_verbose);
 	}
@@ -2088,6 +2102,9 @@ If the I<--deleted> option is used, feeds marked as deleted are
 shown instead of normal feeds.
 
 B<ls> is an alias for B<list>.
+
+If the B<--only-ready> option is used, only podcasts with items ready
+for download will be shown.
 
 =item B<elist> I<filters>
 
