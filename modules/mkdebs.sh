@@ -10,7 +10,7 @@ erex () {
 if [ $# -gt 0 ]; then
 	modules="$@"
 else
-	modules="stuff_chart stuff_bytesize stuff_column stuff_debug stuff_expiryset stuff_mktemp stuff_morse stuff_parserange stuff_range stuff_relpath stuff_statset stuff_table stuff_text stuff_usage"
+	modules="stuff_chart stuff_bytesize stuff_column stuff_debug stuff_expiryset stuff_gnostic stuff_mktemp stuff_morse stuff_parserange stuff_range stuff_relpath stuff_statset stuff_table stuff_text stuff_usage"
 fi
 
 for p in $modules; do

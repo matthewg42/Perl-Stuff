@@ -1,0 +1,16 @@
+Source: libstuff-gnostic-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 7)
+Build-Depends-Indep: perl
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Standards-Version: 3.8.4
+Homepage: https://launchpad.net/stufftools/
+
+Package: libstuff-gnostic-perl
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl, libdate-manip-perl
+Description: Stuff::Gnostic
+ Stuff::Gnostic is an object module that formats data for the
+ Gnostic visualization tool.
+ See http://porpoisehead.net/mysw/gnostic for more details.
