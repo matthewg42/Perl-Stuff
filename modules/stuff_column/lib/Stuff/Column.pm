@@ -78,6 +78,8 @@ sub new {
     my $class = ref($that) || $that;
     my %details = @_;
     my $self = bless { }, $class;
+
+    $details{'format'} = 's' if (!defined($details{'format'}));
     
     $self->init(%details);
 
@@ -129,7 +131,7 @@ sub init {
 	my $len = $1;
 	if ( $len < length($column_info{title}) ) {
 	    $column_info{width} = length($column_info{title});
-	    db_out(0,"Stuff::Column::init: column $column_info{name} title is wider then the column ($column_info{width} > $len), setting to title width", "M");
+	    db_out(3,"Stuff::Column::init: column $column_info{name} title is wider then the column ($column_info{width} > $len), setting to title width", "M");
 	}
     }
 

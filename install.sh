@@ -39,7 +39,7 @@ install_programs () {
     echo "INSTALLING PROGRAMS..."
     pushd programs
     mkdir -p "$PREFIX/bin" "$PREFIX/share/man/man1"
-    for src in ascii2morse.pl cr2crlf.pl dms2dec.pl hms2dec.pl dec2dms.pl dec2hms.pl groupby.pl isprime.pl log_bt_ip.pl morse2ascii.pl sq.pl sumup.pl qps.pl spam_bl_check.pl; do
+    for src in ascii2morse.pl cr2crlf.pl dms2dec.pl hms2dec.pl dec2dms.pl dec2hms.pl groupby.pl isprime.pl log_bt_ip.pl morse2ascii.pl sq.pl sumup.pl qps.pl spam_bl_check.pl tabulate.pl; do
 	program="${src%.pl}"
 	echo "Installing $program"
 	

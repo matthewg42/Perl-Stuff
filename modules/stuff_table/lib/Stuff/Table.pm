@@ -63,12 +63,13 @@ Creates a new table object.
 
 sub new {
     my $that = shift;
+    my %params = @_;	
     my $class = ref($that) || $that;
     my $self = bless {
-	_gutter         => " ",
+	_gutter         => $params{'gutter'} || " ",
 	_column_order   => [],       # array of names in order left -> right 
 	_number_columns => 0,
-	_null_desc      => "-",
+	_null_desc      => defined($params{'empty'}) ? $params{'empty'} : "-",
 	_line_append    => "\n",
     }, $class;
     
