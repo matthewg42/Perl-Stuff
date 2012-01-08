@@ -1,0 +1,44 @@
+Stuff currently has a horrible shell script installer.  This will be
+changed in future releases to something a little more conventional and
+pleasant to use.  
+
+
+To Install "Stuff" Tools
+------------------------
+
+1.  Uncompress stuff-0.01.tar.bz2
+2.  Change into the stuff-0.01 directory
+3.  [optional] Edit the "install.sh" file to choose which components 
+    to install.
+4a. Run this command to install the programs in the default place
+    (/usr/local): 
+ 
+   ./install.sh
+
+4b. Or run this command to choose to install to /opt/stuff   
+
+   PREFIX=/opt/stuff ./install.sh
+
+
+If you install to some area where the perl modules won't be in the
+module search path, don't forget to set the PERL5LIB environment
+variable so that the modules can be found.  You may also want to add
+the location of the manual pages to the MANPATH.  The easiest way to
+do this is to add these lines to your shell initialization file.  
+
+For example, if you use "bash", add these lines to your .bashrc file:
+
+  export PERL5LIB="$PERL5LIB:/opt/stuff/lib/perl5/site_perl" 
+  export MANPATH="$MANPATH:/opt/stuff/share/man"
+
+Or if you use some csh type shell, add this to the end of your .cshrc
+(or whatever file it is for your shell):
+
+  setenv PERL5LIB "$PERL5LIB:/opt/stuff/lib/perl5/site_perl" 
+  setenv MANPATH "$MANPATH:/opt/stuff/share/man"
+
+
+
+Enjoy,
+-- 
+Matthew

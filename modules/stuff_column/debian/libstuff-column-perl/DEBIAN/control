@@ -1,0 +1,14 @@
+Package: libstuff-column-perl
+Version: 0-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 60
+Depends: perl, libstuff-debug-perl
+Section: perl
+Priority: optional
+Homepage: https://launchpad.net/stufftools/
+Description: models a table column for fixed font use
+ Stuff::Column is an object module that models a table column. It was created
+ for use by Stuff::Table.
+ .
+ Columns have the following properties:

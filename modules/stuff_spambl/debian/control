@@ -1,0 +1,16 @@
+Source: libstuff-spambl-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 7)
+Build-Depends-Indep: perl
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Standards-Version: 3.8.4
+Homepage: https://launchpad.net/stufftools/
+
+Package: libstuff-spambl-perl
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
+Description: check spam blacklist status of a host
+ Stuff::SpamBL looks up a host in DNS for spam blacklist status. The
+ constructor can take and or FQDN, and optionally a spam blacklist name. The
+ default spam blacklist is "dnsbl.sorbs.net".

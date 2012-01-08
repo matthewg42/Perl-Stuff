@@ -1,0 +1,11 @@
+Package: libstuff-text-perl
+Version: 0.03-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 60
+Depends: perl, libstuff-debug-perl
+Section: perl
+Priority: optional
+Homepage: https://launchpad.net/stufftools/
+Description: text manipulation knick-knacks
+ Text manipulation gubbins.

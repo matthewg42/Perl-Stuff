@@ -1,0 +1,2384 @@
+#!/usr/bin/perl
+###############################################################################
+# mpodder - a slightly more sophisticated command line podcast client.
+# https://launchpad.net/stufftools
+#
+# Copyright (C) 2005, 2010, Matthew Gates <matthew@porpoisegead.net>
+#
+# See Section "COPYRIGHT & LICENSE" below for licensing information
+###############################################################################
+
+
+package PodCastItem;
+
+use POSIX;
+use strict;
+use warnings;
+
+# Note that "url" is a url to a web page that describes the show or
+# something like that, it is NOT the url to the mp3/ogg/whatever.
+# That is what "media_url" is for.
+
+sub new {
+	my $that   = shift;
+	my $class  = ref($that) || $that;
+	my %values = @_;
+
+	if (!defined($values{'feed_id'})) {
+		die "PodCastItem.new: feed_id is required but was not defined";
+	}
+
+	my $self = bless {
+	           	'id'              => $values{'id'}              || undef,
+	           	'feed_id'         => $values{'feed_id'}         || undef,
+	           	'url'             => $values{'url'}             || "",
+	           	'title'           => $values{'title'}           || "<no title>",
+	           	'local_path'      => $values{'local_path'}      || undef,
+	           	'create_date'     => $values{'create_date'}     || undef,
+	           	'update_date'     => $values{'update_date'}     || undef,
+	           	'pub_date'        => $values{'pub_date'}        || undef,
+	           	'download_date'   => $values{'download_date'}   || undef,
+	           	'download_errors' => $values{'download_errors'} || 0,
+	           	'download_count'  => $values{'download_count'}  || 0,
+	           	'media_url'       => $values{'media_url'}       || undef,
+	           	'media_length'    => $values{'media_length'}    || undef,
+	           	'media_type'      => $values{'media_type'}      || undef,
+	                'listened'        => $values{'listened'}        || 0,
+	           }, $class;
+
+	# do some sanitizing of text fields
+	$self->{'title'} = main::sanitize_string($self->{'title'});
+
+	main::db_out(9, "PodCastItem.new: generated new item title: " . $self->{'title'});
+
+	return $self;
+}
+
+sub dump_str {
+	my $self = shift;
+	my $str  = "";
+	$str .= "  title        = " . ($self->{'title'} || "<no title>") . "\n";
+	$str .= "  pub date     = ";
+
+	if (defined($self->{'pub_date'})) {
+		defined($self->{'pub_date'}) ? $str .= strftime("%Y-%m-%d %T\n", localtime($self->{'pub_date'})) : $str .= "<no pub date>";
+	}
+	else {
+		$str .= "<no pub date>\n";
+	}
+
+	$str .= "  media_url    = " . ($self->{'media_url'}    || "<no audio url>") . "\n";
+	$str .= "  media_length = " . ($self->{'media_length'} || "<no audio length>") . "\n";
+	$str .= "  media_type   = " . ($self->{'media_type'}   || "<no audio type>") . "\n\n";
+	return $str;
+}
+
+sub dump {
+	my $self = shift;
+	print $self->dump_str();
+}
+
+sub pdate {
+	# this is the pub_date, but if there is no pub_date defined, the values is taken from
+	# other fields, so we should always have a date, even if that is just the current
+	# date
+	my $self = shift;
+
+	foreach (qw(pub_date create_date update_date)) {
+		if (defined($self->{$_})) { 
+			return $self->{$_};
+		}
+	}
+	return 0;
+}
+
+sub pending_download {
+	my $self = shift;
+	if (($self->{'listened'} || 0) != 0) {
+		return 0;
+	}
+
+	# ok it hasn't been listened to already.
+	# lets see if there is a copy of the file on the filesystem
+
+	my $local_path = main::get_podcast_dir() . "/" . $self->get_local_path();
+	if (-e $local_path) { return 0; }
+
+	return 1;
+}
+
+sub get_local_path {
+	my $self = shift;
+	if (!defined($self->{'local_path'})) {
+		my $feed = main::db_get_feed_by_id($self->{'feed_id'}) || die "PodCastItem.get_local_path could not get feed";
+		$self->{'local_path'} = main::nomsan($feed->{'title'})
+		                        . "/" . main::nomsan($self->{'title'})
+		                        . "-" . $self->{'id'}
+		                        . "." . main::file_extension($self->{'media_url'});
+	}
+	return $self->{'local_path'};
+}
+
+sub local_file_exists {
+	my $self = shift;
+	my $local_path = main::get_podcast_dir() . "/" . $self->get_local_path();
+	return (-e $local_path);
+}
+
+sub delete_file {
+	my $self = shift;
+	if ($self->local_file_exists()) {
+		my $p = $self->get_episode_location();
+		unlink $p;
+		return 1;
+	}
+	return 0;
+}
+
+sub get_episode_location {
+	my $self = shift;
+	if ($self->local_file_exists()) {
+		return main::get_podcast_dir() . "/" . $self->get_local_path();
+	}
+	else {
+		return $self->{'media_url'};
+	}
+}
+
+sub save {
+	my $self = shift;
+	main::db_out(7, "PodCastItem.save for " . $self->{'title'});
+	main::db_update_item($self);
+}
+
+
+
+
+
+
+package PodCastFeed;
+
+use POSIX;
+use strict;
+use warnings;
+
+sub new {
+	my $that   = shift;
+	my $class  = ref($that) || $that;
+	my %values = @_;
+	my $self = bless {
+	           	'id'             => $values{'id'}             || undef,
+	           	'url'            => $values{'url'}            || undef,
+	           	'title'          => $values{'title'}          || undef,
+	           	'description'    => $values{'description'}    || undef,
+	           	'create_date'    => $values{'create_date'}    || main::get_now(),
+	           	'update_date'    => $values{'update_date'}    || undef,
+	           	'check_count'    => $values{'check_count'}    || 0,
+	           	'download_count' => $values{'download_count'} || 0,
+	           	'deleted'        => $values{'deleted'}        || 0,
+	           	'items'          => $values{'items'}          || undef,
+	                '_icache'        => 0,
+	           }, $class;
+
+	# do some sanitizing of text fields
+	$self->{'title'} = main::sanitize_string($self->{'title'});
+	$self->{'description'} = main::sanitize_string($self->{'description'});
+
+	main::db_out(9, "PodCastFeed.new: generated new feed URL: " . $self->{'url'});
+
+	return $self;
+}
+
+sub add_item {
+	my $self = shift;
+	my $item = shift;
+
+	if (!defined($item)) {
+		die "PodCastFeed::add_item - no item specified";
+	}
+
+	if (!$item->isa('PodCastItem')) {
+		die "PodCastFeed::add_item - parameter is not an item";
+	}
+
+	if (!defined($self->{'items'})) {
+		$self->{'items'} = [$item];
+	}
+	else {
+		my $ar = $self->{'items'};
+		my @a  = @$ar;
+
+		@a = (@a, $item);
+
+		$self->{'items'} = \@a;
+	}
+}
+
+sub dump_str {
+	my $self = shift;
+	my $str  = "";
+
+	$str .= "  title        = " . ($self->{'title'}       || "<no title>") . "\n";
+	$str .= "  url          = " . ($self->{'url'}         || "<no url>") . "\n";
+	# $str .= "  description  = " . ($self->{'description'} || "<no description>") . "\n";
+	$str .= "  update date  = ";
+
+	if (defined($self->{'update_date'})) {
+		$str .= strftime("%Y-%m-%d %T\n", localtime($self->{'update_date'}));
+	}
+	else {
+		$str .= "<no update date>\n";
+	}
+
+	$str .= "  items:\n";
+
+	my $ar = $self->{'items'};
+	foreach my $item (@$ar) {
+		$str .= "  ITEM:\n" . $item->dump_str();
+	}
+
+	return $str;
+}
+
+sub dump {
+	my $self = shift;
+	print $self->dump_str();
+}
+
+sub get_items {
+	my $self = shift;
+	if (!$self->{'_icache'}) {
+		# we don't have items cached, lets go get them from the database.
+		$self->{'items'} = main::db_get_episodes_for_feed($self->{'id'});
+		$self->{'_icache'} = 1;
+	}
+	return @{$self->{'items'}}
+}
+
+sub update {
+	my $self = shift;
+	my $new_count = 0;
+
+	# get the items if they're not already gotten
+	$self->get_items();
+	
+	my $rss;
+
+	eval {
+		$rss = XML::Feed->parse(URI->new($self->{'url'})) || die "PodCastFeed: " . XML::Feed->errstr;
+	};
+	if ($@) {
+		main::db_out(-1, "PodCastFeed.update: cannot get feed url: " . XML::Feed->errstr);
+		return 0;
+	}
+
+	foreach my $entry ($rss->entries) {
+		my ($ep_media_url);
+		my $enc;
+		eval { 
+			$enc = $entry->enclosure;
+			$ep_media_url = $enc->url; 
+		}; 
+		if ($@ || ! defined($ep_media_url)) {
+			main::db_out(6, "PodCastFeed.update: no enclosure url, skipping rss item");
+			next;
+		}
+
+		# check if we have already got this URL for this feed.
+		my $isnew = 1;
+		foreach my $item ($self->get_items()) {
+			if ($item->{'media_url'} eq $ep_media_url) {
+				$isnew = 0;
+				last;
+			}
+		}
+		if (!$isnew) {
+			main::db_out(8, "PodCastFeed.update: skipping because we already have url $ep_media_url");
+			next;
+		}
+
+		# OK, so at this point we have a new episode URL.  Lets get extra information from the
+		# RSS feed data and create a new item from it.
+		my $ep_title;
+		eval { 
+			$ep_title = $entry->title;
+		}; 
+		$ep_title = $ep_title || "<no title>";
+
+		# clean up the title a bit (get rid of new lines and such)
+		$ep_title =~ s/[\t ]*\n[\t ]*//g;
+		$ep_title =~ s/^\s+//; 
+		$ep_title =~ s/\s+$//;
+
+		my $pub_date;
+		eval {
+			$pub_date = $entry->issued;
+		};
+		if (!defined($pub_date)) { $pub_date = DateTime->now; }
+
+		main::db_out(7, "PodCastFeed.update: got episode details: Title: \"$ep_title\" / URL: $ep_media_url / Date: $pub_date");
+		my $new_item = new PodCastItem('feed_id'         => $self->{'id'},
+		                               'url'             => $entry->link || undef,
+		                               'title'           => $ep_title,
+		                               'create_date'     => main::get_now(),
+		                               'pub_date'        => $pub_date->strftime("%s"),
+		                               'media_url'       => $ep_media_url,
+		                               'media_length'    => main::parse_media_length($enc->length),
+		                               'media_type'      => $enc->type || undef,
+		                               'listened'        => 0);
+
+		$self->add_item($new_item);
+		main::db_create_item($new_item);
+		$new_count++;
+	}
+
+	$self->{'update_date'} = main::get_now();
+	$self->save();
+	return $new_count;
+}
+
+sub save {
+	my $self = shift;
+	main::db_out(7, "PodCastFeed.save for " . $self->{'id'} . " / " . $self->{'title'});
+	main::db_update_feed($self);
+}
+
+
+
+
+
+
+
+
+package main;
+
+###############################################################################
+# Main program
+###############################################################################
+
+use strict;
+use warnings;
+use Getopt::Long;
+use vars qw($USER_AGENT);
+use Stuff::Debug qw(db_out);
+use Stuff::Usage qw(usage full_usage version_message);
+use Stuff::Text qw(delimit_data);
+use Stuff::Table;
+use Text::Abbrev;
+use Sys::Hostname;
+use LWP::Simple;
+use XML::Parser;
+use Date::Parse;
+use DB_File;
+use File::Basename;
+use File::Temp qw(tempfile tempdir);
+use DBI;
+use POSIX;
+use DateTime;
+use XML::Feed;
+use XML::Feed::Enclosure;
+
+use constant STUFF_PROG_DESCRIPTION => 'mpodder';
+use constant STUFF_PROG_COPYRIGHT   => '(C) 2010; released under the GNU GPL version 3';
+use constant STUFF_PROG_VERSION     => '0.06';
+use constant STUFF_PROG_AUTHOR      => 'Matthew Gates';
+
+use constant ERR_BAD_USAGE => 2;
+use constant ERR_FEED_EXISTS => 3;
+use constant ERR_BAD_CONFIGURATION => 4;
+
+BEGIN {
+	$USER_AGENT = \&STUFF_PROG_DESCRIPTION . '/' . \&STUFF_PROG_VERSION;
+	db_out(1, "$Stuff::Debug::this_script version " . \&STUFF_PROG_VERSION . ', starting');
+}
+
+END {
+	db_out(1, 'END');
+}
+
+my $dbh;
+
+my %gh_get_methods = (
+	'aria2c'   => { 'sub' => 'get_with_aria2c',  'order' => 1, },
+	'wget'     => { 'sub' => 'get_with_wget',    'order' => 2, },
+	'curl'     => { 'sub' => 'get_with_curl',    'order' => 3, },
+	'mpodder'  => { 'sub' => 'get_with_mpodder', 'order' => 4, },
+);
+
+my %gh_notify_methods = (
+	'none'        => { 'sub' => 'notify_with_none',     'order' => 1, },
+	'notify-send' => { 'sub' => 'notify_with_notify',   'order' => 2, },
+	'xmessage'    => { 'sub' => 'notify_with_xmessage', 'order' => 3, },
+	'kdialog'     => { 'sub' => 'notify_with_kdialog',  'order' => 4, },
+	'mailx'       => { 'sub' => 'notify_with_mailx',    'order' => 5, },
+);
+
+my $gs_config_dir      = $ENV{'HOME'} . "/.mpodder";
+
+my %gh_config = (
+		 'PODCAST_DIR'    => {
+			'VALUE'         => "$ENV{'HOME'}/podcasts",
+		        'COMMENT'       => "The directory where your MP3/OGG files will end up.",
+			'VALIDATION_RE' => '.',
+		 },
+		 'MAX_AGE'        => {
+			'VALUE'         => 0,
+		        'COMMENT'       => "The maximum age in days of files you wish to download.",
+			'VALIDATION_RE' => '^\d+(\.\d+)?$',
+		 },
+		 'MAX_ITEMS' => {
+			'VALUE'         => 0,
+		        'COMMENT'       => "The maximum number of items to download. 0 for all.",
+			'VALIDATION_RE' => '^\d+(\.\d+)?$',
+		 },
+		 'DATABASE_FILE' => {
+			'VALUE'         => "$gs_config_dir/mpodder.sqlite3",
+		        'COMMENT'       => "The file containing the sqlite3 database of podcasts.",
+		        'VALIDATION_RE' => ".",
+		 },
+		 'NOTIFY' => {
+			'VALUE'         => "none",
+		        'COMMENT'       => "supported methods: " . join(", ", keys %gh_notify_methods),
+		        'VALIDATION_RE' => '^(' . join('|', keys %gh_notify_methods) . ')$',
+		 },
+		 'NOTIFY_ADDRESS' => {
+			#'VALUE'         => "$ENV{'USER'}\@" . hostname(),
+			'VALUE'         => "",
+		        'COMMENT'       => "email address for email notifications.",
+		        'VALIDATION_RE' => ".",
+		 },
+		 'GET_METHOD' => {
+			'VALUE'         => "",  # we'll set this after GetOptions so that the --debig has effect
+		        'COMMENT'       => "supported methods: " . join(", ", sort { $gh_get_methods{$a}{'order'} <=> $gh_get_methods{$b}{'order'} } keys %gh_get_methods),
+		        'VALIDATION_RE' => '^(' . join('|', keys %gh_get_methods) . ')$',
+		 },
+);
+
+my %gh_example_feeds = (
+	"The Skeptics Guide to the Universe" => "http://www.theskepticsguide.org/feed/rss.aspx?feed=SGU",
+	"This American Life" => "http://feeds.thisamericanlife.org/talpodcast",
+	"2600: Off The Hook" => "http://www.2600.com/rss.xml",
+	"Linux Outlaws" => "http://feeds.feedburner.com/linuxoutlaws-ogg",
+	"The SubGenius Hour of Slack Podcast" => "http://hourofslack.libsyn.com/rss",
+	"Science Weekly from the Guardian" => "http://www.guardian.co.uk/science/series/science/podcast.xml",
+	"Science Magazine Podcast" => "http://www.sciencemag.org/rss/podcast.xml",
+);
+
+my @ga_schema_objects = (
+"CREATE TABLE feeds (
+	id		INTEGER PRIMARY KEY NOT NULL,
+	url		VARCHAR(2048),
+	title 		VARCHAR(512),
+	description 	TEXT(512),
+	create_date	INTEGER,
+	update_date 	INTEGER, 
+	check_count	INTEGER,
+	download_count	INTEGER,
+	deleted         INTEGER
+);",
+"CREATE TABLE episodes (
+	id		INTEGER PRIMARY KEY NOT NULL,
+	feed_id		INTEGER REFERENCES feeds(id) NOT NULL,
+	url		VARCHAR(2048),
+	title		VARCHAR(512),
+	local_path      VARCHAR(1024),
+	create_date	INTEGER,
+	update_date	INTEGER,
+	pub_date	INTEGER,
+	download_date	INTEGER,
+	download_errors INTEGER,
+	download_count	INTEGER,
+	media_url	VARCHAR(2048),
+	media_length	INTEGER,
+	media_type	VARCHAR(256),
+	listened	INTEGER
+);
+CREATE TABLE settings ( 
+	key		VARCHAR(128),
+	value		VARCHAR(256)
+);
+INSERT INTO settings (key, value) VALUES ('mpodder_version', '" . &STUFF_PROG_VERSION . "');
+",
+);
+
+# Script scope variables that will be used to store settings.
+my $gs_flg_age         = 0;
+my $gs_flg_deleted     = 0;
+my $gs_flg_verbose     = 0;
+my $gs_flg_podcast_dir = $ENV{'HOME'} . "/podcasts";
+my $gs_config_file     = "$gs_config_dir/config";
+my $gs_force           = 0;
+my $gs_flg_leave       = 0;
+my $gs_flg_strict_ids  = 0;
+my $gs_flg_parallel    = 1;
+my $gs_flg_url         = 0;
+my $gs_flg_only_ready  = 0;
+my $gs_flg_display_all = 0;
+
+# Parse command line options.  Love GetOptions:
+GetOptions(
+           'all'            => \$gs_flg_display_all,
+	   'age=i'          => \$gs_flg_age,
+	   'config-file=s'  => \$gs_config_file,
+           'deleted'        => \$gs_flg_deleted,
+	   'debug=i'        => \$Stuff::Debug::debug_level{'S'},
+	   'directory=s'    => \$gs_flg_podcast_dir,
+	   'force'          => \$gs_force,
+	   'help'           => sub { full_usage(0); },
+           'leave=i'        => \$gs_flg_leave,
+	   'only-ready'     => \$gs_flg_only_ready,
+           'parallel=i'     => \$gs_flg_parallel,
+           'strict-ids'     => \$gs_flg_strict_ids,
+           'url'            => \$gs_flg_url,
+	   'verbose'        => \$gs_flg_verbose,
+	   'version'        => sub { version_message(); exit 0; },
+) or usage(ERR_BAD_USAGE);
+
+# Would have done this when making %gh_config above, but then we would miss out on 
+# debug messages when the have a --debug option specified...
+$gh_config{'GET_METHOD'}{'VALUE'} = get_first_get_method();
+
+# Variables for command handling.
+my %gh_command_subs = (
+		       'configure' => \&mpodder_configure,
+		       'settings'  => \&mpodder_dump_settings,
+		       'list'      => \&mpodder_list,
+		       'ls'        => \&mpodder_list,
+                       'elist'     => \&mpodder_elist,
+                       'els'       => \&mpodder_elist,
+                       'lse'       => \&mpodder_elist,
+		       'add'       => \&mpodder_add,
+		       'delete'    => \&mpodder_delete,
+		       'remove'    => \&mpodder_delete,
+		       'rm'        => \&mpodder_delete,
+		       'undelete'  => \&mpodder_undelete,
+		       'purge'     => \&mpodder_purge,
+		       'nuke'      => \&mpodder_purge,
+		       'reset'     => \&mpodder_reset,
+		       'update'    => \&mpodder_update,
+		       'download'  => \&mpodder_download,
+		       'dl'        => \&mpodder_download,
+                       'fetch'     => \&mpodder_fetch,
+		       'catchup'   => \&mpodder_catchup,
+);
+my %gh_command_abbrevs    = abbrev keys %gh_command_subs;
+my $gs_command            = "list"; # the default command
+my @ga_command_parameters = ();
+
+if ($#ARGV >= 0) {
+	$gs_command            = shift;
+	@ga_command_parameters = @ARGV;
+}
+
+defined($gh_command_abbrevs{$gs_command}) || die "unknown command: $gs_command\n";
+$gs_command = $gh_command_abbrevs{$gs_command};
+
+# This sub checks to see if configuration needs to be run (for creation of
+# ~/.mpodder and the like).
+setup_check();
+
+# Trap signals.  This is useful for SIGINT when downloads are happeneing - we can kill the
+# child and terminate without just the child getting the signal.
+$SIG{'INT'} = "interrupt_trap";
+$SIG{'HUP'} = "interrupt_trap";
+$SIG{'TERM'} = "interrupt_trap";
+
+# OK, call it...
+db_out(1, "going to call command " . $gh_command_abbrevs{$gs_command} . "(" . join(",", @ga_command_parameters) . ")");
+exit $gh_command_subs{ $gh_command_abbrevs{$gs_command} }(@ga_command_parameters);
+
+#########################################################################
+# Subroutines
+# Sections of this file:
+# 1 Top level (mpodder) functions
+# 2 DB (database) functions
+# 3 DB (database) functions
+#########################################################################
+# Top level (mpodder) functions
+##
+sub mpodder_configure {
+	my @params = @_;
+
+	if ($#params < 0) {
+		mpodder_interactive_config();
+	}
+
+	load_config_file();
+
+	foreach my $setting (@params) {
+		if ($setting =~ /^([A-Z_]+)=(.*)$/) {
+			configure_option($1, $2);
+		}
+		else {
+			db_out(-1, "parameter to config command is not valid: $setting");
+			exit ERR_BAD_USAGE;
+		}
+	}
+
+	save_config_file();
+
+	return 0;
+}
+
+sub mpodder_interactive_config {
+	db_out(2, "mpodder_interactive_config");
+	if (! -d $gs_config_dir) {
+		db_out(0, "mpodder_interactive_config: configuration directory, \"$gs_config_dir\" does not exist - creating it...");
+		mkdir $gs_config_dir || die "mpodder_interactive_config: could not create settings dir, $gs_config_dir : $!\n";
+	}
+
+	foreach my $setting (qw(PODCAST_DIR MAX_AGE MAX_ITEMS NOTIFY NOTIFY_ADDRESS GET_METHOD)) {
+		my $defval = $gh_config{$setting}{'VALUE'};
+		my $desc =   $gh_config{$setting}{'COMMENT'};
+		$gh_config{$setting}{'VALUE'} = prompt_for_setting($setting);
+	}
+
+	save_config_file();
+
+	open_database();
+
+	my $query = "SELECT 1 FROM feeds;";
+	my @result;
+
+	eval { 
+		@result = $dbh->selectrow_array($query);
+	}; 
+	die "mpodder_interactive_config: failed to run query: $query" if $@;
+
+	if ($#result < 0) { 
+		print "You don't have any feeds set up at the moment.\n";
+		print "Would you like to choose a few examples? (y/n)\n[y]> ";
+		my $res = <>;
+		chomp $res;
+		if ($res =~ /^(y(es)?)?$/i) {
+			foreach my $title (keys %gh_example_feeds) {
+				print "Would you like to add: \"$title\" (y/n)?\n[y]> ";
+				$res = <>;
+				chomp $res;
+				if ($res =~ /^(y(es)?)?$/) {
+					db_out(6, "mpodder_interactive_config: adding feed: $title");
+					mpodder_add($gh_example_feeds{$title}, $title);
+				}
+			}
+		}
+		else {
+			print "ok, you should add some feeds with the \"mpodder add\" command...\n";
+		}
+	}
+
+	return 0;
+}
+
+sub mpodder_dump_settings {
+	load_config_file();
+
+	print "Settings:\n";
+	foreach my $setting (sort keys %gh_config) {
+		printf("  %-20s = %s\n", $setting, $gh_config{$setting}{'VALUE'});
+	}
+
+	print "\nFeeds:\n";
+	my @feeds = load_feed_list();
+	foreach my $f (@feeds) {
+		print "  $f\n";
+	}
+
+	return 0;
+}
+
+sub mpodder_list {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+
+	my @feeds = db_get_feeds('deleted' => $gs_flg_deleted, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n");
+		return 0;
+	}
+
+	my $title_w = 0;
+	foreach my $f (@feeds) {
+		if (length($f->{'title'}) > $title_w) { $title_w = length($f->{'title'}); }
+	}
+
+	my $t = new Stuff::Table;
+
+	$t->add_column('name' => 'ID', 'format' => 'd', 'width' => 3, 'align' => 'right');
+	$t->add_column('name' => 'Title', 'format' => 's', 'width' => $title_w);
+	$t->add_column('name' => 'Last Episode Date', 'format' => 's', 'width' => 20);
+	$t->add_column('name' => 'Dld', 'format' => 'd', 'align' => 'right');
+	$t->add_column('name' => 'DlR', 'format' => 'd', 'align' => 'right');
+	$t->add_column('name' => 'Total', 'format' => 'd', 'align' => 'right');
+
+	print $t->title_str();
+	print $t->underline_str();
+
+	my $printed_count = 0;
+	foreach my $f (@feeds) {
+		my @episodes = $f->get_items();
+		my $last_ep_date = undef;
+		my $e_is_local = 0;
+		my $eunlistened = 0;
+		my $etotal = 0;
+		foreach my $ep (@episodes) {
+			if (($ep->{'pub_date'}||0) > ($last_ep_date||0)) {
+				$last_ep_date = $ep->{'pub_date'};
+			}
+			if ($ep->local_file_exists()) { $e_is_local++; }
+			elsif (($ep->{'listened'} || 0) == 0) { $eunlistened++; }
+			$etotal++;
+		}
+		
+		if (($gs_flg_only_ready && $eunlistened) || !$gs_flg_only_ready)
+		{
+			$printed_count++;
+			print $t->array_row($f->{'id'},
+					    $f->{'title'} || '<no title>',
+					    defined($last_ep_date) ? DateTime->from_epoch('epoch' => $last_ep_date)->strftime("%Y-%m-%d %T") : "-",
+					    $e_is_local, 
+					    $eunlistened, 
+					    $etotal);
+		}
+	}
+	print "\n";
+
+	printf "%d%s feeds %s\n", $printed_count, 
+	                          ($gs_flg_deleted ? " deleted" : ""),
+	                          ($#filters < 0) ? "found" : "matching specified filters";
+
+}
+
+sub mpodder_elist {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	my @feed_filters;
+	my @episode_filters;
+
+	foreach my $filter (@filters) {
+		if ($filter =~ /^e:(.*)$/) {
+			push @episode_filters, $1;
+		}
+		else {
+			push @feed_filters, $filter;
+		}
+	}
+
+	load_config_file();
+	open_database();
+
+	my @feeds = db_get_feeds('deleted' => $gs_flg_deleted, 'filter_list' => \@feed_filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n");
+		return 0;
+	}
+
+	my $ftitle_w = 0;
+	my $etitle_w = 0;
+	my $url_w = 0;
+	foreach my $f (@feeds) {
+		if (length($f->{'title'}) > $ftitle_w) { 
+			$ftitle_w = length($f->{'title'}); 
+		}
+
+		foreach my $i ($f->get_items()) {
+			if ($gs_flg_display_all || $i->{'listened'} == 0) {
+				if (length($i->{'title'}) > $etitle_w) {
+					$etitle_w = length($i->{'title'}); 
+				}
+				if (length($i->get_episode_location()) > $url_w) {
+					$url_w = length($i->get_episode_location()); 
+				}
+			}
+		}
+	}
+
+	my $t = new Stuff::Table;
+	$t->add_column('name' => 'ID', 'format' => 'd', 'width' => 3, 'align' => 'right');
+	$t->add_column('name' => 'FID', 'format' => 'd', 'width' => 3, 'align' => 'right');
+	$t->add_column('name' => 'Feed Title', 'format' => 's', 'width' => ($ftitle_w > 10 ? $ftitle_w : 10));
+	$t->add_column('name' => 'Episode Title', 'format' => 's', 'width' => ($etitle_w > 13 ? $etitle_w : 13));
+	$t->add_column('name' => 'Date Published', 'format' => 's', 'width' => 20);
+	$t->add_column('name' => 'Episode Location', 'format' => 's', 'width' => ($url_w > 11 ? $url_w : 11));
+	$t->add_column('name' => 'LIS', 'format' => 's');
+	$t->add_column('name' => 'DLD', 'format' => 's');
+
+	print $t->title_str();
+	print $t->underline_str();
+
+	my $ecount = 0;
+	foreach my $f (@feeds) {
+		foreach my $i ($f->get_items()) {
+			if ($gs_flg_display_all || $i->{'listened'} == 0) {
+				print $t->array_row($i->{'id'},
+						    $i->{'feed_id'},
+						    $f->{'title'},
+						    $i->{'title'},
+				                    defined($i->{'pub_date'}) ? DateTime->from_epoch('epoch' => $i->{'pub_date'})->strftime("%Y-%m-%d %T") : "-",
+						    $i->get_episode_location(),
+						    $i->{'listened'} ? "yes" : "no",
+						    $i->local_file_exists() ? "yes" : "no");
+				$ecount++;
+			}
+		}
+	}
+	print "\n";
+
+	printf "found %d %s for %d%s %s\n", $ecount,
+	                                    $ecount == 1 ? "episode" : "episodes",
+	                                    $#feeds+1,
+	                                    $gs_flg_deleted ? " deleted" : "",
+	                                    $#feeds+1 == 1 ? "feed" : "feeds";
+
+}
+
+sub mpodder_add {
+	my $url = shift || die "mpodder_add: expected some argument (a URL of a podcast feed), but got nothing";
+ 	my $title = shift || undef;
+
+
+	db_out(2, "mpodder_add: adding feed $url" . (defined($title) ? "(with title \"$title\")" : "(no title specified)" ) );
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	if (db_feed_exists($url)) {
+		db_out(0, "mpodder_add: not adding because feed already exists with url $url");
+		return ERR_FEED_EXISTS;
+	}
+
+	print "Adding feed... " if ($gs_flg_verbose);
+
+	my $rss = XML::Feed->parse(URI->new($url)) || die "mpodder_add: error getting RSS feed $url: " . XML::Feed->errstr;
+	if (!defined($title)) {
+		$title = $rss->title || "<feed title fail>";
+	}
+
+	print "\"$title\"... " if ($gs_flg_verbose);
+
+	db_out(11, "mpodder_add: making feed item with url = $url, title = $title");
+
+	my $feed = new PodCastFeed('url' => $url, 
+	                           'title' => $title, 
+	                           'description' => $rss->description || '<feed description fail>');
+
+
+	db_create_feed($feed);
+	print "done.\n" if ($gs_flg_verbose);
+}
+
+sub mpodder_update {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	my @feeds = db_get_feeds('deleted' => 0, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n");
+		return 0;
+	}
+
+	foreach my $f (@feeds) {
+		printf "Updating %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		my $num_new = $f->update();
+		printf "%d new %s\n", $num_new, $num_new == 1 ? "episode" : "episodes" if ($gs_flg_verbose);
+	}
+}
+
+sub mpodder_delete {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	my @feeds = db_get_feeds('deleted' => 0, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
+		return 0;
+	}
+
+	foreach my $f (@feeds) {
+		printf "Deleting %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		$f->{'deleted'} = 1;
+		$f->save();
+		print "done\n" if ($gs_flg_verbose);
+	}
+}
+
+sub mpodder_undelete {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	my @feeds = db_get_feeds('deleted' => 1, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
+		return 0;
+	}
+
+	foreach my $f (@feeds) {
+		printf "Undeleting %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		$f->{'deleted'} = 0;
+		$f->save();
+		print "done\n" if ($gs_flg_verbose);
+	}
+}
+
+sub mpodder_purge {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	my @feeds = db_get_feeds('deleted' => 1, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
+		return 0;
+	}
+
+	foreach my $f (@feeds) {
+		printf "Purging %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		# TODO this would be better done in the PodCastItem class
+		# TODO because we can clean up the in-memory cached items that way.
+		my $icount = 0;
+		foreach my $i ($f->get_items()) {
+			$i->delete_file();
+			my $num = db_purge_item($i);
+			$icount++;
+		}
+		printf "%d %s ... ", $icount, $icount == 1 ? "item" : "items" if ($gs_flg_verbose);
+		db_purge_feed($f);
+		print "and feed done\n" if ($gs_flg_verbose);
+	}
+}
+
+sub mpodder_reset {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	my @feeds = db_get_feeds('deleted' => 0, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
+		return 0;
+	}
+
+	foreach my $f (@feeds) {
+		printf "Resetting %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		# TODO this would be better done in the PodCastItem class
+		# TODO because we can clean up the in-memory cached items that way.
+		my $icount = db_purge_all_items_for_feed($f->{'id'});
+		printf "%d %s deleted\n", $icount, $icount == 1 ? "item" : "items" if ($gs_flg_verbose);
+	}
+}
+
+sub mpodder_catchup {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	my @feeds = db_get_feeds('deleted' => 0, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
+		return 0;
+	}
+
+	foreach my $f (@feeds) {
+		printf "Catching up %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		# TODO this would be better done in the PodCastItem class
+		# TODO because we can clean up the in-memory cached items that way.
+		my $icount = 0;
+		my @items = sort { $b->pdate() <=> $a->pdate() } $f->get_items();
+		for (my $i=0; $i<$gs_flg_leave; $i++) {
+			$items[$i]->{'listened'} = 0;
+			$items[$i]->save();
+		}
+		for (my $i=$gs_flg_leave; $i <= $#items; $i++) {
+			if (($items[$i]->{'listened'} || 0) == 0)
+			{
+				$items[$i]->{'listened'} = 1;
+				$items[$i]->save();
+				$icount++;
+			}
+		}
+		printf "%d %s marked as listened\n", $icount, $icount == 1 ? "item" : "items" if ($gs_flg_verbose);
+	}
+}
+
+sub mpodder_download {
+	my @filters = @_;
+	my $num_filters = $#filters + 1;
+	my $printed = 0;
+
+	load_config_file();
+	open_database();
+	$| = 1 if ($gs_flg_verbose);
+
+	my @feeds = db_get_feeds('deleted' => 0, 'filter_list' => \@filters);
+
+	if ($#feeds < 0) {
+		print "no feeds " . (($#filters < 0) ? "found\n" : "matching specified filters\n") if ($gs_flg_verbose);
+		return 0;
+	}
+
+	my @items_to_download;
+	foreach my $f (@feeds) {
+		# printf "Downloading feed %-3d %s ... ", $f->{'id'}, $f->{'title'} if ($gs_flg_verbose);
+		my $count = 0;
+		foreach my $i ($f->get_items()) {
+			if ($i->pending_download()) {
+				push @items_to_download, $i;
+				printf "Queued for download: %-30s / %s\n", substr($f->{'title'}, 0, 29), $i->{'title'};
+				$count++;
+			}
+		}
+	}
+
+	print "\n" if ($gs_flg_verbose);
+	my $ci = $#items_to_download + 1;
+	printf("Total %d %s ready for download\n", $ci, $ci == 1 ? "item" : "items") if ($gs_flg_verbose);
+
+	download_enqueued_items(@items_to_download);
+}
+
+sub mpodder_fetch {
+	my $retval = 0;
+	$retval += mpodder_update(@_);
+	$retval += mpodder_download(@_);
+	return $retval;
+}
+
+#########################################################################
+# DB (database) functions
+##
+sub db_get_feeds {
+	my %options = @_;
+	my @filters = @{$options{'filter_list'}};
+	my @feeds;
+
+	my $query = "SELECT id, url, title, description, create_date, update_date, check_count, download_count, deleted FROM feeds";
+	if (defined($options{'deleted'})) {
+		$query .= " WHERE deleted = " . $options{'deleted'};
+	}
+	$query .= ";";
+
+	db_out(5, "db_get_feeds: query = $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	die "db_get_feeds: failed to execute query \"$query\"" if ($@);
+
+	while(my $href = $sth->fetchrow_hashref)
+	{
+		my $want = 0;
+
+		# if any filter matches, we want the record
+		foreach my $filter (@filters) {
+			if ($href->{'id'} eq $filter) {
+				$want = 1; 
+				last;
+			}
+
+			if (!$gs_flg_strict_ids) {
+				if ($href->{'title'} =~ /$filter/ || $href->{'url'} =~ /$filter/) {
+					$want = 1;
+					last;
+				}
+			}
+		}
+
+		# also, if there are no filters we also want it
+		if ($#filters < 0) { $want = 1; }
+
+		if ($want) {
+			my $feed = new PodCastFeed(%$href);
+			push @feeds, $feed;
+		}
+	}
+	return @feeds;
+}
+
+sub db_get_episodes_for_feed {
+	my $id = shift || die "db_get_episodes_for_feed: no feed id specified";
+	my @episodes;
+
+	my $query = "SELECT id, feed_id, url, title, local_path, create_date, update_date, pub_date, download_date, download_errors, download_count, media_url, media_length, media_type, listened FROM episodes WHERE feed_id = $id;";
+
+	db_out(5, "db_get_episodes_for_feed: query = $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	die "db_get_episodes_for_feed: failed to execute query \"$query\"" if ($@);
+
+	while(my $href = $sth->fetchrow_hashref)
+	{
+		my $ep = new PodCastItem(%$href);
+		push @episodes, $ep;
+	}
+
+	db_out(8, "db_get_episodes_for_feed: got " . ($#episodes + 1) . " episodes for feed $id");
+	return \@episodes;
+}
+
+sub db_feed_exists {
+	my $url = shift || die "db_feed_exists: no URL specified";
+	$url = safe_sql_string($url);
+	my $query = "SELECT COUNT(1) FROM feeds WHERE url = '$url';";
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_feed_exists: failed to execute query \"$query\"";
+	}
+
+	my @r = $sth->fetchrow_array || return 0;
+	return 1;
+}
+
+sub db_get_feed_by_id {
+	my $id = shift || die "db_get_feed_by_id: no id specified";
+	my $query = "SELECT id, url, title, description, create_date, update_date, check_count, download_count, deleted FROM feeds WHERE id = $id;";
+	db_out(5, "db_get_feed_by_id: query = $query");
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	die "db_get_feed_by_id: failed to execute query \"$query\"" if ($@);
+
+	my $feed;
+	while(my $href = $sth->fetchrow_hashref)
+	{
+		$feed = new PodCastFeed(%$href);
+		last;
+	}
+	return $feed;
+}
+
+sub db_create_feed {
+	my $feed = shift || die "db_create_feed: no feed specified";
+	my $query = "INSERT INTO feeds (url, title, description, create_date, check_count, download_count, deleted) VALUES ("
+	            . "'" . safe_sql_string($feed->{'url'}) . "', "
+	            . "'" . (safe_sql_string($feed->{'title'}) || '') . "', "
+	            . "'" . (safe_sql_string($feed->{'description'}) || '') . "', "
+	            . get_now() . ", "
+	            . "0, "
+	            . "0, "
+	            . "0 );";
+
+	db_out(5, "db_create_feed: query is $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_create_feed: failed to execute query \"$query\"";
+	}
+}
+
+sub db_update_feed {
+	my $feed = shift || die "db_update_feed: no feed specified";
+	my $query = "UPDATE feeds SET "
+	            . db_make_update_clause('url', 'NULL', $feed, "'") . ', '
+	            . db_make_update_clause('title', 'NULL', $feed, "'") . ', '
+	            . db_make_update_clause('description', 'NULL', $feed, "'") . ', '
+	            . db_make_update_clause('create_date', 'NULL', $feed) . ', '
+	            . db_make_update_clause('update_date', 'NULL', $feed) . ', '
+	            . db_make_update_clause('check_count', 'NULL', $feed) . ', '
+	            . db_make_update_clause('download_count', 'NULL', $feed) . ', '
+	            . db_make_update_clause('deleted', 0, $feed) . ' '
+	            . " WHERE id = " . $feed->{'id'} . ";";
+
+	db_out(5, "db_update_feed: query is $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_update_feed: failed to execute query \"$query\"";
+	}
+}
+
+sub db_purge_feed {
+	my $feed = shift || die "db_purge_feed: no feed specified";
+	if (!defined($feed->{'id'})) {
+		die "db_purge_feed: feed has no ID";
+	}
+
+	my $query = "DELETE FROM feeds WHERE id = " . $feed->{'id'} . ";";
+
+	db_out(5, "db_purge_feed: query is $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_purge_feed: failed to execute query \"$query\"";
+	}
+}
+
+sub db_purge_item {
+	my $item = shift || die "db_purge_item: no item specified";
+	if (!defined($item->{'id'})) {
+		die "db_purge_item: item has no ID";
+	}
+
+	my $query = "DELETE FROM episodes WHERE id = " . $item->{'id'} . ";";
+
+	db_out(5, "db_purge_item: query is $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_purge_item: failed to execute query \"$query\"";
+	}
+}
+
+sub db_purge_all_items_for_feed {
+	my $id = shift || die "db_purge_all_items_for_feed: no item specified";
+
+	my $query = "DELETE FROM episodes WHERE feed_id = " . $id . ";";
+
+	db_out(5, "db_purge_all_items_for_feed: query is $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_purge_all_items_for_feed: failed to execute query \"$query\"";
+	}
+	return $sth->rows;
+}
+
+sub db_create_item {
+	my $item = shift || die "db_create_item: no item specified";
+	my $query = "INSERT INTO episodes (feed_id, url, title, local_path, create_date, update_date, pub_date, download_date, download_errors, download_count, media_url, media_length, media_type, listened) VALUES ("
+	            . nvl('NULL', $item->{'feed_id'}) . ", "
+	            . "'" . (safe_sql_string($item->{'url'}) || '') . "', "
+	            . "'" . (safe_sql_string($item->{'title'}) || '') . "', "
+	            . "'" . (safe_sql_string($item->{'local_path'}) || '') . "', "
+	            . nvl('NULL', $item->{'create_date'}) . ", "
+	            . nvl('NULL', $item->{'update_date'}) . ", "
+	            . nvl('NULL', $item->{'pub_date'}) . ", "
+	            . nvl('NULL', $item->{'download_date'}) . ", "
+	            . nvl('NULL', $item->{'download_errors'}) . ", "
+	            . nvl('NULL', $item->{'download_count'}) . ", "
+	            . "'" . (safe_sql_string($item->{'media_url'}) || '') . "', "
+	            . nvl('NULL', $item->{'media_length'}) . ", "
+	            . "'" . (safe_sql_string($item->{'media_type'}) || '') . "', "
+	            . nvl('NULL', $item->{'listened'}) . " );";
+
+	db_out(5, "db_create_item: query is $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_create_item: failed to execute query \"$query\"";
+	}
+}
+
+sub db_update_item {
+	my $item = shift || die "db_update_item: no item specified";
+	my $query = 'UPDATE episodes SET '
+	            . db_make_update_clause('feed_id', 'NULL', $item) . ', '
+	            . db_make_update_clause('url', 'NULL', $item, "'") . ', '
+	            . db_make_update_clause('title', 'NULL', $item, "'") . ', '
+	            . db_make_update_clause('local_path', 'NULL', $item, "'") . ', '
+	            . db_make_update_clause('create_date', 'NULL', $item) . ', '
+	            . db_make_update_clause('update_date', 'NULL', $item) . ', '
+	            . db_make_update_clause('pub_date', 'NULL', $item) . ', '
+	            . db_make_update_clause('download_date', 'NULL', $item) . ', '
+	            . db_make_update_clause('download_errors', 'NULL', $item) . ', '
+	            . db_make_update_clause('download_count', 'NULL', $item) . ', '
+	            . db_make_update_clause('media_url', 'NULL', $item, "'") . ', '
+	            . db_make_update_clause('media_length', 'NULL', $item) . ', '
+	            . db_make_update_clause('media_type', 'NULL', $item, "'") . ', '
+	            . db_make_update_clause('listened', 'NULL', $item) . ' '
+	            . 'WHERE id = ' . $item->{'id'} . ';';
+
+
+	db_out(5, "db_update_item: query is $query");
+
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+	if ($@) {
+		die "db_update_item: failed to execute query \"$query\"";
+	}
+}
+
+sub db_make_update_clause {
+	my $fname = shift     || die "make_update_clause: expected fname as first param";
+	my $nullvalue = shift;
+	if (! defined($nullvalue)) { die "make_update_clause: expected nullvalue as second param"; }
+
+	my $object = shift    || die "make_update_clause: expected object as third param";
+	my $q = shift || undef;   # fourth param is quote character if any
+
+	if (defined($q)) {
+		return sprintf("%s = $q%s$q", $fname, nvl($nullvalue, safe_sql_string($object->{$fname})));
+	}
+	else {
+		return sprintf("%s = %s", $fname, nvl($nullvalue, $object->{$fname}));
+	}
+}
+
+#########################################################################
+# Misc functions
+##
+sub sanitize_string {
+	my $_ = shift;
+	s/–/-/g;
+	s/’/'/g;
+	s/»/=-/g;
+	s/«/-=/g;
+	return $_;
+}
+
+sub parse_media_length {
+	# this function always returns undef or a number of bytes as an integer
+	# it can handle media lengths which look like any of these:
+	# 123.45 MB
+	# 123.45 MB
+	my $_ = shift || return undef;
+	if (/^\d+$/) { return $_; }
+	elsif (/^(\d+(\.(\d+))?)\s*mi?b$/i) { 
+		return int($1 * 1000000);
+	}
+	elsif (/^(\d+(\.(\d+))?)\s*ki?b$/i) { 
+		return int($1 * 1000);
+	}
+	elsif (/^(\d+(\.(\d+))?)\s*gi?b$/i) { 
+		return int($1 * 1000000000);
+	}
+	else {
+		db_out(0, "parse_media_length: input \"$_\" isn't recognised");
+		return undef;
+	}
+}
+
+sub nvl {
+	my $undef_value = shift;
+	if (!defined($undef_value)) { die "nvl: first argument should be the undefined value"; }
+	my $value = shift;
+	if (!defined($value)) {
+		return $undef_value;
+	}
+	else {
+		return $value;
+	}
+}
+
+sub save_config_file {
+	db_out(5, "save_config_file() trying to save to $gs_config_file");
+
+	open(CONFIG, ">$gs_config_file") || die "unable to open config file \"$gs_config_file\" for writing: $!\n";
+
+	print CONFIG "# saved configuration for " . \&STUFF_PROG_DESCRIPTION . ", " . strftime("%Y-%m-%d %T", (localtime(time))) . "\n";
+	print CONFIG "# generated by " . \&STUFF_PROG_DESCRIPTION . " version " . \&STUFF_PROG_VERSION ." by " . ($ENV{'USER'} || "<unknown user>"). " on " . hostname() . "\n\n";
+
+	foreach my $setting (sort keys %gh_config) {
+		if (defined($gh_config{$setting}{'COMMENT'})) {
+			print CONFIG ("# " . $gh_config{$setting}{'COMMENT'} . "\n");
+		}
+		print CONFIG ("$setting=" . $gh_config{$setting}{'VALUE'} . "\n\n");
+	}
+
+	close(CONFIG);
+}
+
+sub load_config_file {
+	# returns 0 on failure to read file, 1 on success
+	db_out(5, "load_config_file() loading from $gs_config_file");
+
+	if (!open(CONFIG, "<" . $gs_config_file)) {
+		if ($gs_command eq "configure") { 
+			return; 
+		}
+		else { 
+			die "cannot read configuration file: \"$gs_config_file\" : $!\n";
+		}
+	}
+
+	while (<CONFIG>) {
+		chomp;
+		if (/^\s*([A-Z_]+)\s*\=\s*(.+)\s*$/) {
+			if (!configure_option($1, $2)) {
+				db_out(0, "load_config_file: at line $. - invalid config option");
+			}
+		}
+		else {
+			db_out(10, "load_config_file: skipping line at $. : $_");
+		}
+	}
+
+	close(CONFIG);
+}
+
+sub get_first_get_method {
+	db_out(3, "get_first_get_method: going to try to work out what methods we have available");
+	foreach my $prog (grep { ! /^mpodder$/ } 
+			  sort { $gh_get_methods{$a}{'order'} <=> $gh_get_methods{$b}{'order'} } 
+			  keys %gh_get_methods) {
+		db_out(4, "looking for $prog in the PATH...");
+		foreach my $p (split(":", $ENV{'PATH'})) {
+			db_out(6, "looking for in $p/$prog");
+			if (-e $p . "/" . $prog) {
+				db_out(3, "found $prog in $p");
+				return $prog;
+			}
+		}
+	}
+	return "mpodder";
+}
+
+# returns 1 if success (valid arguments), 0 otherwise
+sub configure_option {
+	my ($setting, $value) = @_;
+
+	db_out(5, "configure_option($setting, $value)");
+
+	if (!defined($gh_config{$setting}{'VALUE'})) {
+		return 0;
+	}
+
+	$gh_config{$setting}{'VALUE'} = $value;
+	return 1;
+}
+
+sub prompt_for_setting {
+	my $setting = shift || return;
+	my $re = $gh_config{$setting}{'VALIDATION_RE'} || "";
+
+	db_out(6, "prompt_for_setting: for setting \"$setting\", with validation re: /$re/");
+
+	print "Choose a value for $setting\n";
+	print "Notes: " . $gh_config{$setting}{'COMMENT'} . "\n";
+
+	my $tries = 3;
+	while ($tries > 0) {
+		print "[" . $gh_config{$setting}{'VALUE'} . "] > ";
+		my $in = <>;
+		chomp $in;
+		if ($in eq "") {
+			db_out(7, "prompt_for_setting: returning default value, \"" . $gh_config{$setting}{'VALUE'} . "\"");
+			return $gh_config{$setting}{'VALUE'};
+		}
+		else {
+			if ($in =~ /$re/) { 
+				db_out(7, "prompt_for_setting: returning validated input, \"$in\"");
+				return $in;
+			}
+			else {
+				print "That doesn't look right...  try again ($tries tries left)\n";
+				$tries--;
+			}
+		}
+	}
+	print "I didn't get any valid response there... I'm going to leave you with the default\n";
+	db_out(7, "prompt_for_setting: couldn't validate input so returning default value, \"" . $gh_config{$setting}{'VALUE'} . "\"");
+	return $gh_config{$setting}{'VALUE'};
+}
+
+sub setup_check {
+	my $do_warning = 0;
+
+	if (!-r $gs_config_file && $gs_command ne "configure") {
+		db_out(0, "config file is not readable: \"$gs_config_file\" - you might need to run $Stuff::Debug::this_script configure");
+		exit ERR_BAD_CONFIGURATION;
+	}
+
+	load_config_file();
+
+	my $podcast_link = $gh_config{'PODCAST_DIR'}{'VALUE'};
+	my $podcast_dir  = $podcast_link;
+	while (-l $podcast_link) {
+		$podcast_dir  = readlink($podcast_link);
+		$podcast_link = $podcast_dir;
+	}
+}
+
+sub get_podcast_dir {
+	return $gh_config{'PODCAST_DIR'}{'VALUE'};
+}
+
+sub get_now {
+	return DateTime->now->strftime("%s");
+}
+
+sub safe_sql_string {
+	my $_ = shift || return '';
+	s/'/''/g;
+	return $_;
+}
+
+sub purge_feed {
+	my $id = shift || die "purge_feed: no feed ID provided";
+
+	# get rid of episode files and records
+	purge_episodes($id);
+
+	# 3. delete feed record
+	my $query = "DELETE from feeds WHERE id = $id;";
+	my $rows_affected = 0;
+	eval {
+		$rows_affected = $dbh->do("$query");
+	};
+	if ($@) {
+		die "purge_feed: failed to execute query: \"$query\"";
+	}
+	if ($rows_affected <= 0) {
+		die "purge_feed: something weird happened - I could not delete feed with ID $id";
+	}
+}
+
+sub purge_episodes {
+	my $id = shift || die "purge_episodes: no feed ID provided";
+	my $rows_affected;
+
+	# 1. nuke downloaded episodes from the filesystem
+	my $query = "SELECT id FROM episodes WHERE feed_id = $id;";
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+
+	while (my @r = $sth->fetchrow_array) {
+		my $path = get_local_path($r[0]);
+		if (defined($path)) {
+			if (-e $path) {
+				db_out(4, "purge_feed: removing file for ep $id: $path");
+				unlink $path;
+			}
+			else {
+				db_out(6, "purge_feed: local file not exist for ep $id: $path");
+			}
+		}
+		else {
+			db_out(6, "purge_feed: no local file found in database ep $id");
+		}
+	}
+
+	# 2. delete episode records
+	$query = "DELETE from episodes WHERE feed_id = $id";
+	$rows_affected = 0;
+	eval {
+		$rows_affected = $dbh->do("$query");
+	};
+	if ($@) {
+		die "purge_feed: failed to execute query: \"$query\"";
+	}
+}
+
+sub get_local_path {
+	my $ep_id = shift || return undef;
+
+	my $query = "SELECT local_path FROM episodes WHERE id = $ep_id;";
+	my $sth = $dbh->prepare($query);
+	eval {
+		$sth->execute;
+	};
+
+	while (my @r = $sth->fetchrow_array) {
+		if (($r[0] || "") ne "") {
+			return $gh_config{'PODCAST_DIR'}{'VALUE'} . "/" . $r[0];
+		}
+		else {
+			return undef;
+		}
+	}
+	return undef;
+}
+
+sub download_enqueued_items {
+	my @items = @_;
+	if ($gs_flg_parallel > 1) {
+		return parallel_downloader(@items);
+	}
+
+	# simple sequential downloader
+	my($dl_ok, $dl_fail) = (0,0);
+	foreach my $item (@items) {
+		printf "Downloading item %3d %-40s ... ", $item->{'id'}, $item->{'title'};
+		my $res = download_url('url'       => $item->{'media_url'}, 
+			     'localpath' => $gh_config{'PODCAST_DIR'}{'VALUE'} . "/" . $item->get_local_path());
+		my $ok = 0;
+		if (defined($res)) {
+			if (-e $res) {
+				$ok = 1;
+			}
+		}
+
+		if ($ok) {
+			$dl_ok++;
+			$item->{'download_count'}++;
+			print "success\n";
+		}
+		else {
+			$dl_fail++;
+			$item->{'download_error'}++;
+			print "failed\n";
+		}
+
+		$item->{'download_date'} = get_now();
+		$item->{'listened'} = 1;
+		$item->save();
+	}
+
+	printf "all done (%d ok, %d failed)\n", $dl_ok, $dl_fail;
+	return $dl_ok;
+}
+
+sub parallel_downloader {
+	my @items = @_;
+	# this routine works by generating a Makefile in a temporary directory
+	# the Makefile contains one target per local file name
+	# 
+}
+
+sub nomsan {
+	my $_ = shift || return "";
+
+	s/^\s+//g;
+	s/\s+$//g;
+	s/%20/_/g;
+	s/\#//g;
+	s/!/_/g;
+	s/ /_/g;
+	s/_+/_/g;
+	s/[–\(\)\[\]\{\}\\]/-/g;
+	s/\&/and/g;
+	s/[\'\`:\?\"]//g;
+	s/_-_/-/g;
+	s/,//g;
+
+	return lc($_);
+}
+
+sub file_extension {
+	my $_ = shift || return "";
+	db_out(9, "file_extension input = $_");
+	$_ = basename($_);
+	s/\?.*$//;
+	s/^.*\.//;
+	db_out(7, "file_extension: returning \"$_\"");
+	return $_;
+}
+
+sub get_url_last_mod_date {
+	my $url = shift;
+
+	print "checking timestamp for $url...  " if ($gs_flg_verbose);
+
+	my ($content_type, $document_length, $modified_time, $expires, $server) = LWP::Simple::head($url);
+	if (!defined($modified_time)) {
+		db_out(0, "get_url_last_mod_date - could not fetch headers for $url");
+		print "[failed to fetch HTTP headers!]" if ($gs_flg_verbose);
+	}
+	else {
+		print strftime("%Y-%m-%d %T\n", localtime($modified_time)) if ($gs_flg_verbose);
+	}
+	return $modified_time || 1;
+}
+
+sub guess_date_from_url {
+	my $url = shift;
+
+	if ($url =~ /\D(\d\d\d\d-\d\d-\d\d)\D/) {
+		my $guess = str2time($1);
+		db_out(5, "guess_date_from_url: url = $url, format = YYYY-MM-DD, guessed $1 = $guess = " . strftime("%Y-%m-%d", localtime($guess)));
+		return $guess;
+	}
+	elsif ($url =~ /\D((\d\d)[\-:]?(\d\d)[\-:]?(\d\d))\D/) {
+
+		# OK this case might or might not be a date, we'll do some heuristics of sorts
+		# to try to guess if it is
+		my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time);
+		$year = ($year + 1900) % 100;
+
+		db_out(6, "guess_date_from_url: candidate 6 digit date: $1 : $2 $3 $4");
+
+		if (
+		     ($year - $4) < 3    # year is in the last 2 years
+		     && ($year - $4) >= 0    # but year not in the future
+		     && $3 > 0                      # month is between 1
+		     && $3 < 13                     # ... and 12
+		     && $2 <= maxdaysinmonth($3)    # day is in valid range for month
+		     && $2 > 0
+		  )
+		{
+
+			# this looks like DDMMYY
+			my $guess = str2time(sprintf("%04d-%02d-%02d", $4, $3, $2));
+			db_out(5, "guess_date_from_url: url = $url, format = DDMMYY, guessed $1 = $guess = " . strftime("%Y-%m-%d", localtime($guess)));
+			return $guess;
+		}
+		elsif (
+			($year - $2) < 3            # year is in the last 2 years
+			&& ($year - $2) >= 0        # but year not in the future
+			&& $3 > 0                   # month is between 1
+			&& $3 < 13                  # ... and 12
+			&& $4 <= maxdaysinmonth($3) # day is in valid range for month
+			&& $4 > 0
+		  )
+		{
+
+			# this looks like YYMMDD
+			my $guess = str2time(sprintf("%04d-%02d-%02d", $2, $3, $4));
+			db_out(5, "guess_date_from_url: url = $url, format = YYMMDD, guessed $1 = $guess = " . strftime("%Y-%m-%d", localtime($guess)));
+			return $guess;
+		}
+	}
+	elsif ($url =~ /\D((\d{1,2})[ \-\/]?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[ \-\/]?(\d{2,4})\D)/i) {
+		my $guess = str2time("$2/$3/$4");
+		db_out(5, "guess_date_from_url: url = $url, format = d mmm yy[yy], guessed $1 = $guess = " . strftime("%Y-%m-%d", localtime($guess)));
+		return $guess;
+	}
+
+	db_out(5, "guess_date_from_url: url = $url, using current system time");
+	return time();
+}
+
+sub notify_fetched {
+	my $items_fetched = shift || 0;
+	my $message = "You have $items_fetched new podcasts to listen to!\nTo listen, have a look in file://" . $gh_config{'PODCAST_DIR'}{'VALUE'} . "\n";
+	if ($items_fetched <= 0) {
+		return;
+	}
+
+	if ($gh_config{'NOTIFY'}{'VALUE'} eq "mail") {
+	}
+	elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "kdialog") {
+		my $cmd = "kdialog --msgbox \"$message\"";
+		system $cmd;
+	}
+	elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "xmessage") {
+		my $cmd = "xmessage \"$message\"";
+		system $cmd;
+	}
+	elsif ($gh_config{'NOTIFY'}{'VALUE'} eq "none") {
+		db_out(5, "notify_address: OK, no notification requested, not sending one");
+	}
+	else {
+		db_out(0, "notify_address: notification method \"" . $gh_config{'NOTIFY'}{'VALUE'} . "\" is not understood.  If you don't want a notification method, use \"none\"");
+	}
+}
+
+# params:
+# hash with these members:
+# 'url'       => (required) the url to download
+# 'localpath' => (optional) the local path to download into.  If not
+#                specified a temporary filename will be generated
+# 'overwrite' => (optional, default=0) if 1, local files will be silently
+#                overwritten, else download_url will fail should the
+#                local file already exist.
+#
+# returns: path of local file on success, else undef
+sub download_url {
+	my %params = @_;
+
+	db_out(5, "download_url getting $params{'url'}");
+
+	my $dl_method = $gh_config{'GET_METHOD'}{'VALUE'} || die "download_url: no download method set";
+	my $dl_method_sub = $gh_get_methods{$dl_method}{'sub'} || die "download_url: no sub found for method $dl_method";
+
+	my ($url, $fname, $overwrite);
+	if (!defined($params{'url'})) {
+		db_out(-1, "download_url: did not get a url (I expect one!)");
+		return undef;
+	}
+	else {
+		$url = $params{'url'};
+	}
+
+
+	$overwrite = $params{'overwrite'} || 0;
+
+	if (!defined($params{'localpath'})) {
+		my $fh;
+		($fh, $fname) = tempfile();
+		$fh->close;
+	}
+	else {
+		$fname = $params{'localpath'};
+		if (-e $fname) {
+			if ($overwrite) {
+				db_out(1, "download_url: over-writing file $fname");
+			}
+			else {
+				db_out(0, "download_url: not over-writing existing file: $fname");
+				return undef;
+			}
+		}
+	}
+
+
+	db_out(3, "download_url: getting $url -> $fname using method $dl_method which calls $dl_method_sub");
+	if (!eval "$dl_method_sub(\"$url\", \"$fname\")") {
+		db_out(-1, "download_url: error when downloading with $dl_method : $!");
+		unlink $fname;
+		return undef;
+	}
+
+	return $fname;
+}
+
+# These functions should overwrite existing files...
+sub get_with_aria2c {
+	my $url = shift || return undef;
+	my $fname = shift || return undef;
+
+	db_out(4, "get_with_aria2c: url=$url   fname=$fname");
+
+	my @cmd = ('aria2c', '--dir', '/', '--allow-overwrite=true');
+	if (!$gs_flg_verbose) {
+		@cmd = (@cmd, '--quiet');
+	}
+	@cmd = (@cmd, '--out', $fname, $url);
+
+	if (system(@cmd) == 0) {
+		db_out(5, "get_with_aria2c: downloaded $url -> $fname");
+		return 1;
+	}
+	else {
+		die "get_with_aria2c: FAILED to download $url -> $fname";
+	}
+	
+	# TODO: return value...
+}
+
+sub get_with_wget {
+	my $url = shift || return 1;
+	my $fname = shift || basename($url);
+	db_out(0, "get_with_wget: not implemented yet");
+	return 1;
+#	my $cmd = "wget ";
+#	if ($gs_flg_verbose) {
+#		$cmd .= "--verbose ";
+#	}
+#	else {
+#		$cmd .= "--quiet ";
+#	}
+#
+#	$cmd .= "\"$url\"";
+#
+#	# db_out(6, "download_url: GET_METHOD wget, command: $cmd");
+#	my $res = system($cmd);
+#	if ($res == 0) {
+#		$gh_log{$url} = time();
+#		return 1;
+#	}
+#	else {
+#		return 0;
+#	}
+}
+
+sub get_with_curl {
+	my $url = shift || return 1;
+	my $fname = shift || basename($url);
+	db_out(0, "get_with_curl: not implemented yet");
+	return 1;
+
+#	my $cmd = "curl ";
+#	if ($gs_flg_verbose) {
+#		$cmd .= "--verbose ";
+#	}
+#
+#	$cmd .= "\"$url\" ";
+#	$cmd .= "-o \"" . basename($url) . "\"";
+#	my $res = system($cmd);
+#	if ($res == 0) {
+#		$gh_log{$url} = time();
+#		return 1;
+#	}
+#	else {
+#		return 0;
+#	}
+}
+
+sub get_with_mpodder {
+	my $url = shift || return 1;
+	my $fname = shift || basename($url);
+	db_out(0, "get_with_mpodder: not implemented yet");
+	return 1;
+}
+
+sub notify_with_none {
+	db_out(-1, "notify_with_none: not implemented yet");
+	return 0;
+}
+
+sub notify_with_notify {
+	db_out(-1, "notify_with_notify: not implemented yet");
+	return 0;
+}
+
+sub notify_with_xmessage {
+	db_out(-1, "notify_with_xmessage: not implemented yet");
+}
+
+sub notify_with_kdialog {
+	db_out(-1, "notify_with_kdialog: not implemented yet");
+}
+
+sub notify_with_mailx {
+	my $message = shift || return 0;
+	if (! defined($gh_config{'NOTIFY_ADDRESS'}{'VALUE'}) ) {
+		db_out(-1, "notify_with_mailx: NOTIFY_ADDRESS not defined");
+		return 0;
+	} 
+
+	my $cmd = "echo \"$message\" | mailx -s \"New podcasts\" " . $gh_config{'NOTIFY_ADDRESS'}{'VALUE'};
+	system $cmd;
+
+	# TODO: detect fails
+	return 1;
+}
+
+sub maxdaysinmonth {
+	my $month = shift || return 0;
+	$month = int($month);
+	my %monthmaxdays = (
+			    1  => 31,
+			    2  => 29,
+			    3  => 31,
+			    4  => 30,
+			    5  => 31,
+			    6  => 30,
+			    7  => 31,
+			    8  => 31,
+			    9  => 30,
+			    10 => 31,
+			    11 => 30,
+			    12 => 31
+	);
+
+	return ($monthmaxdays{$month} || 0);
+}
+
+sub open_database {
+	if (!defined($gh_config{'DATABASE_FILE'}{'VALUE'})) {
+		db_out(-1, "open_database: DATABASE_FILE setting not defined");
+		exit ERR_BAD_CONFIGURATION;
+	}
+
+	my $create_tables = 0;
+	if (! -e $gh_config{'DATABASE_FILE'}{'VALUE'}) {
+		db_out(0, "open_database: database file $gh_config{'DATABASE_FILE'}{'VALUE'} doesn't exist... it will be created");
+		$create_tables = 1;
+	}
+
+	$dbh = DBI->connect("dbi:SQLite:dbname=$gh_config{'DATABASE_FILE'}{'VALUE'}",
+	                    "", "",
+	                    { RaiseError => 1, PrintError => 1, }
+	                   ) || die "can't open database file $gh_config{'DATABASE_FILE'}{'VALUE'} : $!";
+
+	make_schema() if ($create_tables);
+
+	db_out(1, "open_database: opened database file $gh_config{'DATABASE_FILE'}{'VALUE'}");
+}
+
+sub open_log {
+	db_out(0, "log has been replaced by database");
+}
+
+sub open_feeds {
+	db_out(0, "feeds file has been replaced by database");
+}
+
+sub make_schema {
+	db_out(3, "make_schema: making schema");
+
+	foreach my $query (@ga_schema_objects) {
+		my $otyp = "some object type";
+		my $name = "something";
+		if ($query =~ /create\s+(\w+)\s+(\w+)\s/) {
+			$otyp = $1;
+			$name = $2;
+		}
+
+		db_out(4, "make_schema: making $otyp called \"$name\"");
+		if (!$dbh->do($query)) {
+			die "make_schema: error executing statement: \"$query\" - $!";
+		}
+	}
+}
+
+sub interrupt_trap {
+	my $s = shift || "unknown";
+	db_out(0, "caught signal $s, ABORTING");
+	exit(0);
+}
+
+__END__
+
+=head1 NAME 
+
+mpodder - a slightly more sophisticated bashpodder
+
+=head1 SYNOPSIS
+
+  mpodder [options] [command [command args]]
+
+=head1 DESCRIPTION
+
+B<mpodder> is a podcasting fetch script, similar to bashpodder.  It
+will check podcast feeds for new shows, and download them as
+appropriate.
+
+Features not found in some other podcasting clients include handling
+of re-directs, proper XML parsing to extract tags other than the URLs
+to download (show titles etc).
+
+
+=head1 COMMANDS
+
+If no command is specified, fetch is performed.
+
+"command" is one of the following: 
+
+=over
+
+=item B<list> I<filters>
+
+List podcast feeds.  Normal output is tabular printing the feed ID,
+feed title and feed URL.  The title and URL may be truncated in this
+tabular format if they are long.
+
+If the I<--verbose> option is used, the ID, title and URL are printed
+each on a line of it's own, follwed by some information about known
+episodes for the feed.
+
+If the I<--deleted> option is used, feeds marked as deleted are
+shown instead of normal feeds.
+
+B<ls> is an alias for B<list>.
+
+If the B<--only-ready> option is used, only podcasts with items ready
+for download will be shown.
+
+=item B<elist> I<filters>
+
+List podcast episodes. Filters apply to feeds, all of the episodes
+for matching feeds are printed.  However, by prefixing a filter 
+with the string "e:", the filter will apply to episodes only.  
+
+For example, if the filter "skeptic" is specified, all the episodes
+for all the feeds matching this filter will be printed.  However
+if the filter "e:monkey" is also specified, episodes matching the
+filter "monkey" will be printed for feeds matching the filter 
+"skeptic" will be printed.
+
+Output is in a tabular form with one podcast episode per line of
+output.  Output fields are:
+
+=over
+
+=item Episode ID (labelled "ID")
+
+=item Feed ID (labelled "FID")
+
+=item Feed Title
+
+=item Episode Title
+
+=item Listened (if an episode is marked as listened, labelled "LIS")
+
+=item Downloaded (if an episode has been downloaded, labelled "DLD")
+
+=back
+
+If the command line option B<--new> is used, only unlistened 
+episodes will be printed.
+
+B<els> is an alias for B<elist>.
+
+=item B<add> I<url> [I<title>]
+
+Add a new podcast feed: I<url>.  Optionally specify the title as 
+I<title>.  If no title is specified, the feed will be downloaded
+and the title taken from it.
+
+B<new> is an alias for B<add>.
+
+=item B<catchup> [I<filters>]
+
+This command causes all feeds (filtered by I<filter> if specified) to
+be brought up to date as if all casts had been downloaded.  The casts
+are not actually downloaded, but are flagged in the log as if they
+were.  It's a good way to prevent a busy feed from downloading loads
+of old stuff that you're not interested in.  It's the podcast
+equivalent of returning to the office after vacation, and selecting
+"mark all messages as read" in your mail client... ;)
+
+If the B<--leave>=I<n> option is used, I<n> podcasts are left as 
+not-listened, and will be downloaded in subsequent B<download> commands.
+
+=item B<configure> I<option=value>
+
+If no parameter to the command is supplied, mpodder enters an
+interactive configuration mode.  If a I<option=value> parameter is
+passed, that parameter is updated in the configuration file.
+
+=item B<delete> I<filters>
+
+Removes a feed or feeds from the feed list.  A I<filter> must be
+provided, which is checked against the title and URL or existing
+feeds.  Thie filter works in the same way as the B<list> command, and
+as such it is recommended that a list command is performed first
+with the same filter argument to check which feeds will be deleted
+when the B<delete> command is performed.  If the B<--interactive>
+option is used, the user is promoted before each matching feed is
+deleted.
+
+Feeds are not permanently removed, they are just marked as deleted.  
+Deleted feeds will not appear in the normal output of the list 
+command, will not be checked or have episodes downloaded.  
+However, they may be undeleted using the undelete command.  
+The B<purge> command will permanently remove deleted feeds from
+the database.
+
+Note that downloaded episodes are not deleted until a feed is purged.
+
+B<remove> and B<rm> are aliases for B<delete>.
+
+=item B<download> [I<filters>]
+
+The B<download> command checks each feed matching I<filters> and 
+downloads the media files for any new episodes which do not exist
+locally.  Once an item is downloaded, it is marked as "listened".
+
+See also: B<fetch> command.
+
+=item B<fetch> [I<filters>]
+
+The B<fetch> command runs the update and download commands in order.
+
+See also: B<update> and B<download> commands.
+
+=item B<purge>
+
+Permanently removes feeds which are marked as deleted.  Once B<purge>
+has been run, a feed cannot be undeleted.  Purge will also remove
+any downloaded episodes for the specified feed(s).
+
+B<nuke> is an alias for B<purge>.
+
+=item B<undelete> I<filters>
+
+Looks at deleted podcasts and undeltes them.  If a filter argument is
+provided than only feeds matching the filter are undelted.  The undelete
+filters work the same as the B<list> command filters, so you can preview
+what would be undeleted by using the same filter as an argument to 
+B<list> with the B<--deleted> option.
+
+=item B<update> [I<filters>]
+
+This command makes mpodder check feeds which match I<filters> for new 
+episodes.  If the B<--verbose> option is used, a line of output is 
+printed as each feed is checked and the number of new episodes found 
+is printed once the feed base been updated.  Note that no media is
+downloaded during the B<update> command.  
+
+See also: B<fetch> command.
+
+=back
+
+=head1 OPTIONS
+
+Each option is listed with the corresponding value from the config
+file (in brackets) after the option.
+
+=over
+
+=item B<--age>=I<days> (MAX_AGE)
+
+Sets the maximum age of pod-casts in days.  0 means "no maximium", and
+this is the default.
+
+=item B<--debug>=I<level>
+
+Print diagnostic messages while executing.  The value of I<level> must be an
+integer.  The higher the number, the more verbose the diagnostic output will
+be.
+
+=item B<--directory>=I<path> (PODCAST_DIR)
+
+Select the loction where the podcast files will be put.
+
+=item B<--dump-settings>
+
+Dumps the settings found in the configuration file and exists.
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--strict-ids>
+
+When filtering, only match filters against IDs rather than titles and urls in
+addition to feeds.
+
+=item B<--verbose>
+
+Print more output than normal.
+
+=item B<--Version>
+
+Print the program description and version.
+
+=back
+
+=head1 ENVIRONMENT
+
+=head1 FILES
+
+=head2 config
+
+The mpodder config file is found here: F<$HOME/.mpodder/config>.  It
+contains user-specified defaults.  These values may be overridden
+using command line the options specified above.
+
+This file contains key/value pairs like:
+
+    MAX_AGE=7
+
+Comments (first non-whitespace character on line is a #) and blank
+lines are ignored.
+
+Valid configutation options:
+
+=over
+
+=item MAX_AGE
+
+The maximum age of a pod-cast in days.  All podcasts older than this
+will be ignored.  "0" means no limit, which is the default.
+
+=item PODCAST_DIR
+
+This contains the name of the directory where podcasts will be
+depoisted. The default value is F<$HOME/podcasts>.
+
+=item LOG_FILE
+
+This contains the full path of the log file. The default is
+F<$HOME/.mpodder/log>.
+
+=item FEED_FILE
+
+This contais the full path of the feeds file. The default is
+F<$HOME/.mpodder/feeds>.
+
+=item NOTIFY
+
+This may take one of the following values: B<none> (the default) - no
+notification is sent to the user when a new podcast is downloaded.
+B<kdialog> - uses kdialog to notify the user.  This is horrible by the
+way, and requires that kdialog is installed (part of KDE).
+B<xmessage> just like kdialog, but even uglier.  B<mail> causes an
+email to be sent to the value of NOTIFY_ADDRESS.  mpodder uses the
+command line "mail" program for delivery, so check it is installed and
+working first.
+
+=item NOTIFY_ADDRESS
+
+By default $USER@$`hostname` is used for mail notifications, but if
+youo set this, you can specify another address.
+
+=back
+
+=head2 feeds
+
+The feeds file if found here: F<$HOME/.mpodder/feeds>.  It is a list
+of podcast feed URLS.  The format is the same as bashpodder - i.e. one
+URL per line.
+
+=head2 log
+
+The log file contains a history of which podcasts have been downloaded
+in the past.  This way we can avoid re-downloading a podcast even if
+the actual mp3/ogg file is gone.
+
+=head1 AUTHOR
+
+Matthew Gates E<lt>matthew@porpoisehead.netE<gt>
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright (C) 2005, 2010 by Matthew Gates
+
+This program is released under the terms of the GNU GPL Version 3, 29 June 2007.
+A copy of this license should have been provided with this software (filename
+LICENSE).  The license may also be found at http://www.gnu.org/licenses/gpl.html
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 POSSIBLE FUTURE FEATURES
+
+=over
+
+=item feed schedules 
+
+Feed specific periods of time to check for new episodes (e.g. daily, 
+weekly, monthly).
+
+=item OPML import & export
+
+=head1 SEE ALSO
+
+bashpodder(1)
+
+=cut
+

@@ -1,0 +1,24 @@
+Source: libstuff-bytesize-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 7)
+Build-Depends-Indep: perl
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Standards-Version: 3.8.4
+Homepage: https://launchpad.net/stufftools/
+
+Package: libstuff-bytesize-perl
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
+Description: convert numbers to n-byte sizes (e.g. KiB)
+ Here you can convert from a [possibly very large] number of bytes into some
+ more managable unit such as Gigi-bytes. Well, almost. Many programmers are
+ guilty of doing the calculation incorrrectly, and almost all don't use the
+ proper nomenclature.
+ .
+ The proper (SI standardized) names and quantities are described here:
+ http://physics.nist.gov/cuu/Units/binary.html. Stuff::ByteSize inplements
+ convertsion between quantities of bytes and some confortable binary
+ multiples.
+ .
+ So now you know!

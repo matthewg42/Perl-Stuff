@@ -1,0 +1,26 @@
+Package: libstuff-parserange-perl
+Version: 0.02-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 56
+Depends: perl, libstuff-debug-perl, libstuff-range-perl
+Section: perl
+Priority: optional
+Homepage: https://launchpad.net/stufftools/
+Description: interpret numberic ranges
+ The idea here is to parse ranges on the command line. For example, something
+ like:
+ .
+ print_doc --pages="-6"
+ .
+ print_doc --pages="15-24"
+ .
+ print_doc --pages="28-"
+ .
+ You should get the idea from that. Simple stuff. Uses the Stuff::Range
+ object.
+ .
+ This was written a while ago, and now it seems weird that it wan't coded as a
+ member of Stuff::Range, like Stuff::Range::Parse(...). I'm not sure why!
+ Since there are no existing programs that use it, I think it might be better
+ to move this functionlity into Stuff::Range in a future release.

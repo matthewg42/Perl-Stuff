@@ -1,0 +1,247 @@
+#!/usr/bin/perl -w
+#
+
+use strict;
+use Getopt::Long;
+use Stuff::Debug qw(db_out);
+use Stuff::Usage qw(usage long_usage version_message);
+
+use constant STUFF_PROG_DESCRIPTION => "isprime";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2004; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.03";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+
+my $gs_flg_all_factors = 0;
+my $gs_flg_range_evens = 0;
+my $gs_flg_verbose     = 0;
+
+GetOptions(
+	   'all-factors'       => \$gs_flg_all_factors,
+	   'range-evens!'      => \$gs_flg_range_evens,
+	   'verbose'           => \$gs_flg_verbose,
+	   'help'              => sub { long_usage(0) },
+	   'version'           => sub { version_message(); exit 0; },
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   )     or usage(1);
+
+
+if ( $#ARGV < 0 ) {
+    while(<STDIN>) {
+	s/^\s+//;
+	@_ = split(/\s+/, $_);
+	handle_numbers(@_);
+    }
+}
+else {
+    handle_numbers(@ARGV);
+}
+
+sub handle_numbers {
+    my @number_list = @_;
+    my $found = undef;
+    foreach my $arg ( @number_list ) {
+	if    ( $arg =~ /^\d+$/ )     { $found = check_numbers($arg); }
+	elsif ( $arg =~ /^(\d+)-(\d+)$/ ) { 
+	    db_out(2,"Expanding range: $arg");
+	    my ($min,$max);
+	    if ( $1 < $2 ) {
+		$min = $1;
+		$max = $2;
+	    }
+	    else {
+		$max = $1;
+		$min = $2;
+	    }
+	    
+	    my @nums;
+	    
+	    if ( $min % 2 == 0 && ! $gs_flg_range_evens ) {
+		$min++;
+	    }
+	    
+	    for(my $i=$min; $i<=$max; $i += 2 - $gs_flg_range_evens) {
+		push @nums, $i;
+	    }
+	    
+	    $found = check_numbers(@nums); 
+	}
+	else {
+	    db_out(0,"No, \"$arg\" is NOT a prime, but that might have something to do with it NOT ACTAULLY BEING A NUMBER.  Get real!");
+	    exit(2);
+	}
+    }
+    exit(!$found);
+}
+
+sub check_numbers {
+    my @numbers = @_;
+    my $found_one = 0;
+
+    foreach my $number (@numbers) {
+	my $isprime = 1;
+	
+	if ( $number == 2 ) {
+	    db_out(1, "2 is a special case -- only even prime");
+	}
+	else {
+	    for(my $i=2; $i<=$number/2; $i++) {
+		if ( $number / $i == int($number / $i) ) {
+		    if ( $gs_flg_verbose ) {
+			my $second_factor = $number / $i;
+			if ( $second_factor < $i ) { last; }
+			print "$number is NOT a prime ( $i x " . $second_factor . " == $number )\n";
+		    }
+		    $isprime = 0;
+		    if ( ! $gs_flg_all_factors || ! $gs_flg_verbose ) { last; }
+		}
+	    }
+	}
+	
+	if ( $isprime ) {
+	    if ( $gs_flg_verbose ) {
+		print "$number IS a prime\n";
+	    }
+	    else {
+		print $number . "\n";
+	    }
+	    $found_one = 1;
+	}
+    }
+    return ($found_one);
+}
+
+__END__
+
+=head1 NAME 
+
+isprime - check if numbers are prime or not
+
+=head1 SYNOPSIS
+
+isprime [options] [number|range] ...
+
+
+=head1 DESCRIPTION
+
+B<isprime> reads a list of number from the command line (or STDIN if
+no numbers are provided on the command line), and prints those that
+are prime numbers on stdout.
+
+Only decimal integers are supported at time of writing, so you'll have
+to do your own base conversion if you want to use octal or hex or
+whatever.
+
+If a number range is specified, it should have the format "n-m".  It
+doesn't matter if n or m is lower, isprime will swap them over for you
+if you get it wrong.
+
+=head1 OPTIONS
+
+=over
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--debug>=I<level>
+
+Set the script debugging level to I<level>.  This switch sets all
+types of debugging to this level.  If you want to discriminate between
+the various debugging types (MOdule, DBase, SCript), you should set
+the relevant environment variables instead of using this option.
+
+=item B<--verbose>
+
+Instead of just printing the numbers that are primes, for each number
+considered print a message saying either:
+
+=over
+
+=item For non-primes
+
+[number] is NOT prime ( [factor] x [factor] == [number] )
+
+By default this message is printed once -- for the first factor found.
+
+=item For primes
+
+[number] IS a prime
+
+=back
+
+=item B<--all-factors>
+
+This option only has an effect if the B<--verbose> option is active.
+For non-primes a line is printed for I<every> factor that exists.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_??_DBLEVEL
+
+Sets debugging levels.  The ?? can be DB for database, MO for module,
+or SC for script debugging messages.  Generally only SC and DB are
+interesting for users, MO is mostly just used during development.
+
+=back
+
+=head1 FILES
+
+N/A.
+
+=head1 LICENSE
+
+isprime is released under the GNU GPL (version 3, 29 June 2007).
+
+=head1 AUTHOR
+
+Matthew Gates
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2004-07-08 Added this comment
+
+This comment was added as s test of subversion...  :)
+
+=item Date:2004-04-03 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 RESTRICTIONS
+
+All the math is done by perl, so it's going to freak if you use
+numbers large enough to trigger floating point handling.
+
+Very large numbers will also take an B<age> to test.  That's the
+nature of the beast.  Anything over 100,000,000 is going to be into
+"overnight" territory on my little G3 iBook (though it isn't exactly a
+performance machine).  YMMV.
+
+C<> nice time isprime --verbose 100000007
+100000007 IS a prime
+      248.33 real       178.36 user         0.92 sys>
+
+=head1 BUGS
+
+Please report bugs using L<mng_bug_report>.
+
+=head1 SEE ALSO
+
+=cut
+

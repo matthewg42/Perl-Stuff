@@ -1,0 +1,187 @@
+#!/usr/bin/perl
+# See POD tags at end of this file for documentation.
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use Stuff::Debug qw(&db_out);
+use Stuff::Usage qw(&usage &long_usage &version_message);
+
+use constant STUFF_PROG_DESCRIPTION => "URL sanitizer";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2011; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.01";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+my $gs_unwrap = 1;
+my $gs_browser = "";
+my $gs_open = 0;
+
+GetOptions(
+ 'browser=s'  => \$gs_browser,
+ 'help'       => sub { long_usage(0) },
+ 'debug=i'    => \$Stuff::Debug::debug_level{S},
+ 'open'       => \$gs_open,
+ 'unwrap'     => \$gs_unwrap,
+ 'version'    => sub { version_message(); exit 0; },
+) or usage(1);
+
+if ($gs_browser eq "") {
+	if (-x '/usr/bin/x-www-browser') {
+		$gs_browser = '/usr/bin/x-www-browser';
+	}
+	else {
+		$gs_browser = 'firefox';
+	}
+}
+
+if ($#ARGV < 0) {
+	while(<>) {
+		process_line($_);
+	}
+	exit 0;
+}
+else {
+	foreach (@ARGV) {
+		process_line("$_\n");
+	}
+	exit 0;
+}
+
+sub process_line {
+	my $_ = shift || "";
+	while(s/\%([A-Fa-f0-9]{2})/chr(hex($1))/e) {
+		if ($gs_unwrap) {
+			s|^https?://.*(https?)://|$1://|;
+		}
+                1;
+        }
+	if ($gs_open) {
+		open_in_browser($_);
+	}
+        print;
+}
+
+sub open_in_browser {
+	# We are in the child
+	my @cmd = ($gs_browser, @_);
+	system(@cmd);
+}
+
+__END__
+
+=head1 NAME 
+
+urlsan - sanitize urls
+
+=head1 SYNOPSIS
+
+ urlsan [options] [url [url] ...]
+
+=head1 DESCRIPTION
+
+This program reads urls from the command line or from stdin (if none are 
+specified on the command line), and "sanitizes" the url for readability.
+This means to replace %xx sequences with their ASCII equivalents.  The 
+program can also show just URLs which are embedded as an GET option (for
+example the annoying way that facebook wraps links).
+
+Using the B<--open> option, urlsan opens urls in a browser.  The browser 
+is determined as follows:
+
+=over
+
+=item 1. The argument to the B<--browser> option, if specified.
+
+=item 2. F</usr/bin/x-www-browser> if found
+
+=item 3. F<firefox> if found in PATH.
+
+=back
+
+=head1 OPTIONS
+
+=over
+
+=item B<--browser>=I<path>
+
+Specify the web browser to use to open the URL if the B<--open> option is 
+used.  This should be the name of the program in the PATH, or a full path
+to the executable of a browser. 
+
+=item B<--debug>=I<level>
+
+Print diagnostic messages while executing.  The value of I<level> must be an
+integer.  The higher the number, the more verbose the diagnostic output will
+be.
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--open>
+
+If this option is used, URLs are opened in the current default web browser
+in addition to being printed on standard output.
+
+=item B<--unwrap>
+
+If a URL is embedded in a URL (like facebook does it), 
+
+=item B<--version>
+
+Print the program description and version.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_?_DBLEVEL
+
+Sets debugging levels.  The ? can be D for database, M for module,
+or S for script debugging messages.  Generally only S and D are
+interesting for users, M is mostly just used during development.
+
+=back
+
+=head1 LICENSE
+
+urlsan is released under the GNU GPL (version 3, 29 June 2007).  A
+copy of the license should have been provided in the distribution of
+the software in a file called "LICENSE.GPL".  If you can't find this, then
+try here: http://www.gnu.org/copyleft/gpl.html
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2011-01-28 Created, Author MNG
+
+Stuff-ized an old trivial script, added options.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+=cut
+

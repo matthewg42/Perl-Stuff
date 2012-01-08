@@ -1,0 +1,29 @@
+Format-Specification: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=135
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Source: https://launchpad.net/stufftools/
+Name: Stuff-Table
+
+Files: *
+Copyright: Matthew Gates <matthew@porpoisehead.net>
+License: LGPL-3+
+
+Files: debian/*
+Copyright: 2010, Matthew Gates <matthew@porpoisehead.net>
+License: Artistic
+
+License: LGPL-3+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 3 dated June, 2007, or (at your
+ option) any later version
+ .
+ On Debian GNU/Linux systems, the complete text of version 3 of the GNU
+ General Public License can be found in `/usr/share/common-licenses/GPL-3'
+
+License: Artistic
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the Artistic License, which comes with Perl.
+ .
+ On Debian GNU/Linux systems, the complete text of the Artistic License
+ can be found in `/usr/share/common-licenses/Artistic'
+

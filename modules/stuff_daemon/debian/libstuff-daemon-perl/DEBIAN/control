@@ -1,0 +1,10 @@
+Package: libstuff-daemon-perl
+Version: 0.01-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 64
+Depends: perl, libstuff-debug-perl
+Section: perl
+Priority: optional
+Homepage: https://launchpad.net/stufftools/
+Description: Quick and easy daemonization of a perl program

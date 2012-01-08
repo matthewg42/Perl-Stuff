@@ -1,0 +1,170 @@
+#!/bin/bash
+# Show size of files
+###############################################################################
+# basename and full path of program
+THISSCRIPT=${0##*/}
+THISSCRIPT_FULL="$0"
+
+# Debugging level.  Set this with the -D option:
+# -ve = ERROR
+#   0 = WARNING
+# +ve = DEBUG
+DBLEV_S=${DBLEV_S:-0}
+
+# Some useful function definitions
+usage () {
+  pod2usage $THISSCRIPT_FULL
+  exit ${1:-0}
+}
+
+# usage example (warning): db_out 0 "a warning message"
+db_out () {
+  meslev="${1:-1}"
+  shift
+  message="$@"
+  
+  if [ $meslev -le ${DBLEV_S:-0} ]; then
+    if [ $meslev -lt 0 ]; then
+      mestyp="$THISSCRIPT ERROR[$meslev]:"
+    elif [ $meslev -eq 0 ]; then
+      mestyp="$THISSCRIPT WARNING:"
+    else
+      mestyp="$THISSCRIPT DEBUG[$meslev]:"
+    fi
+
+    print -u2 "$mestyp $message"
+  fi
+}
+
+#
+# End of generic functions and the like
+###############################################################################
+# Start Main Program
+
+PROGNAME="List size of files"
+VERSION="0.01"
+AUTHOR="Matthew Gates, Oct 2011"
+
+if [ "$1" = "--help" ] || [ "$1" = "-help" ]; then
+  usage 0
+fi
+
+set -- `getopt avhD: $@`
+if [ $? -ne 0 ]; then
+  usage 2
+fi
+
+TYPE_PATTERN="regular file"
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    -a)
+	TYPE_PATTERN=.
+	shift
+	;;
+    -D)
+	DBLEV_S=$2
+	shift 2
+	;;
+    -h)
+	usage 0
+	shift
+	;;
+    -v)
+	echo "$PROGNAME; version $VERSION"
+	echo "$AUTHOR"
+	shift
+	;;
+    --)
+	shift
+	break
+	;;
+  esac
+done
+
+db_out 3 "command line parsed, parameters now: $@"
+
+if [ $# -eq 0 ]; then
+	stat --printf '%F %s\n' * |grep "$TYPE_PATTERN" | sumup --size
+else
+	stat --printf '%F %s\n' "$@" |grep "$TYPE_PATTERN" | sumup --size
+fi	
+
+exit 0
+
+__END__
+
+=head1 NAME 
+
+sz - show total size of files in a human readable form.
+
+=head1 SYNOPSIS
+
+sz [options] [pattern]
+
+=head1 DESCRIPTION
+
+sz iterates over files which match the glob pattern I<pattern>, finds the
+size of the files, sums them up and prints out the total size in bytes, KiB, 
+MiB, GiB, TiB - choosing the unit based on the total size (see sumup's 
+B<--size> option for more details).
+
+If no pattern is specified, * is assumed.
+
+=head1 OPTIONS
+
+=over
+
+=item B<-a>
+
+Examine all types of file, including directories.  By default only regular
+files are examined.
+
+=item B<-D> I<level>
+
+Print diagnostic messages while executing.  The value of I<level> must be an
+integer.  The higher the number, the more verbose the diagnostic output will
+be.
+
+=item B<-h>
+
+Print the command line syntax an option details.
+
+=item B<-v>
+
+Print the program description and version.
+
+=back
+
+=head1 LICENSE
+
+sz is released under the GNU GPL (version 3, 29 June 2007).  A
+copy of the license should have been provided in the distribution of
+the software in a file called "LICENSE.GPL".  If you can't find this, then
+try here: http://www.gnu.org/copyleft/gpl.html
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2010-10-30 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+
+=cut
+

@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+#
+
+use strict;
+use Getopt::Long;
+use vars qw($VERSION $PROGDESC);
+use Stuff::Debug qw(db_out);
+use Stuff::Usage qw(usage long_usage);
+
+BEGIN {
+    $VERSION = "0.01";
+    $PROGDESC = "Template Perl Script (Stuff suite) $VERSION";
+
+    db_out(1, "$Stuff::Debug::this_script version $VERSION, starting");
+
+}
+
+GetOptions(
+	   'help'              => sub { long_usage(0) },
+	   'version'           => sub { print $PROGDESC . "\n" },
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   )     or usage(1);
+
+while(<>) {
+    chop;
+    printf "%s%c%c", $_, 0x0d, 0x0a;
+}
+
+__END__
+
+=head1 NAME 
+
+cr2crlf - change cr to cr & lf
+
+=head1 SYNOPSIS
+
+cr2crlf [options] [files] ...
+
+=head1 DESCRIPTION
+
+You know, for DOS boxen.
+
+=head1 OPTIONS
+
+=over
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--debug>=I<level>
+
+Set the script debugging level to I<level>.  This switch sets all
+types of debugging to this level.  If you want to discriminate between
+the various debugging types (Module, Database, Script), you should set
+the relevant environment variables instead of using this option.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_??_DBLEVEL
+
+Sets debugging levels.  The ?? can be D for database, M for module,
+or S for script debugging messages.  Generally only S and D are
+interesting for users, M is mostly just used during development.
+
+=back
+
+=head1 FILES
+
+N/A
+
+=head1 LICENSE
+
+cr2crlf is released under the GNU GPL (version 3, 29 June 2007).
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2003-04-01 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+=cut
+

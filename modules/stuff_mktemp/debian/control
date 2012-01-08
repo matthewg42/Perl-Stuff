@@ -1,0 +1,23 @@
+Source: libstuff-mktemp-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 7)
+Build-Depends-Indep: perl
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Standards-Version: 3.8.4
+Homepage: https://launchpad.net/stufftools/
+
+Package: libstuff-mktemp-perl
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl
+Description: Stuff::Mktemp
+ Stuff::Mktemp began life as a habit of writing my own mktemp function in
+ shell scripts on some old Solaris boxen where the system mktemp was buggy.
+ Since then I got addicted to auto-cleanup of temp files, and so this module
+ continues that suspect practise.
+ .
+ The module keeps track of temporary files that are created by calling the
+ mktemp() function. When cleanup_temp_files() is called they are unlinked if
+ they still exist. It's probably a good idea to trap various signals that
+ might kill you program and have your sigtrap function call
+ cleanup_temp_files().

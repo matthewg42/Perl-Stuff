@@ -1,0 +1,89 @@
+
+Five Minute Jobs
+================
+
++ Make sure all pod docs contain reference to correct license
+
++ Make name consistent.  Should be "Stuff Tools", not just "Stuff"
+  or what have you.
+
++ Delete this crust from TODO before distribution.
+
+
+Larger Projects
+===============
+
+Type.pm and related modules
+---------------------------
+
+This modules was written as the start of a data-type system for
+implementing a simplistic database.  It needs to be overhauled and
+some plans made for what to do with it.  The original idea was to
+write a pure perl relational database with some SQL features.  For
+those poor souls who don't get MySQL databases in their web hosting
+packages but like SQL a lot for some reason.
+
+ascbar
+------
+
+The idea for the program is to read textual data from standard input
+or a file, and write out a ASCII art barchart.  This integrates nicely
+with groupby, and could be used to make some quick and dirty, but
+visual anaysis of various data.  I did a primitive implementation of a
+similar idea at Vodafone D2 and it was a great tool for performance
+analysis.
+
+Best illustrated with an example:
+
+Command:
+
+   ascbar --min 0 \
+          --max 100 \
+          --title="Fruit Ratings" \
+          --x-axis-label="% Fruit Satisfaction"
+
+Data:
+Apples 10
+Oranges 45
+Pears 5
+Bananas 75
+Peaches 23
+
+Output:
+
+Fruit Ratings
+=============
+
+          +----+----+----+----+----+----+----+----+----+----+
+Apples    ######    |    |    |    |    |    |    |    |    |
+Oranges   ######################## |    |    |    |    |    |
+Pears     ###  |    |    |    |    |    |    |    |    |    |
+Bananas   ####################################### |    |    |
+Peaches   ############   |    |    |    |    |    |    |    |
+          +----+----+----+----+----+----+----+----+----+----+
+          0    10   20   30   40   50   60   70   80   90   100
+                          % Fruit Satisfaction
+
+Gentoo Tools
+------------
+
+I've been writing a quick (heavily cached) gentoo query tool for
+relieve some of the pain of searching for packages using "emerge -s".
+It's not ready yet, but should be soon.  Need to finish it off and add
+it to the Stuff Tools.
+
+Tool Finder/Launcher
+--------------------
+
+GUI app that gathers information about installed system programs by
+looking in the PATH, then for each program, using man / info / KDE
+docs / gnome docs / --help -h -? switches etc to get a short
+description of each program.  There should then be a launch interface
+that allows the user to search (incrementally) the tools by keyword.
+All this cos I keep forgetting the name "artsdsp".  :)
+
+Should aggressivley cache usahe data. 
+
+Could use perl/Gtk or perl/Tk or something like that.
+
+

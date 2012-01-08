@@ -1,0 +1,137 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Getopt::Long;
+use Stuff::Debug qw(db_out);
+use Stuff::Usage qw(usage long_usage version_message);
+
+use constant STUFF_PROG_DESCRIPTION => "hms to decimal degrees converter";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2008; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.02";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+GetOptions(
+	   'help'              => sub { long_usage(0); },
+	   'version'           => sub { version_message(); exit 0; },
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   )     or usage(1);
+
+if ( $#ARGV < 2 ) {
+    while(<>) 
+    {
+	convert(split(/\s+/,$_));
+    }
+}
+else {
+    convert(@ARGV);
+}
+
+sub convert {
+    my ($h, $min, $sec) = @_;
+    $h =~ s/H//i;
+    $min =~ s/M//i;
+    $sec =~ s/S//i;
+    my $deg = $h * 15;
+    if ( ! defined($sec) ) {
+	$sec = 0;
+    }
+
+    if ( ! defined($min) ) {
+	$min = 0;
+    }
+
+    my $dec = $deg + ( $min * 15 / 60. ) + ( $sec * 15 / 3600. );
+    printf "%10.8f\n", $dec;
+}
+
+__END__
+
+=head1 NAME 
+
+hms2dec - hours, minutes, seconds to decimal degrees
+
+=head1 SYNOPSIS
+
+hms2dec [options] hours minutes seconds
+
+=head1 DESCRIPTION
+
+hms2dec read an angle in hours minutes and seconds, and outputs the
+same angle in decimal degrees.  If no angle is provided, hms2dec reads
+triplets from STDIN and prints out decimal degrees on STDOUT.
+
+=head1 OPTIONS
+
+=over
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--debug>=I<level>
+
+Set the script debugging level to I<level>.  This switch sets all
+types of debugging to this level.  If you want to discriminate between
+the various debugging types (MOdule, DBase, SCript), you should set
+the relevant environment variables instead of using this option.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_??_DBLEVEL
+
+Sets debugging levels.  The ?? can be DB for database, MO for module,
+or SC for script debugging messages.  Generally only SC and DB are
+interesting for users, MO is mostly just used during development.
+
+=back
+
+=head1 FILES
+
+=over
+
+=item filename
+
+desc
+
+=back
+
+=head1 LICENSE
+
+hms2dec is released under the GNU GPL (version 3, 29 June 2007).
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2003-04-01 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+=cut
+

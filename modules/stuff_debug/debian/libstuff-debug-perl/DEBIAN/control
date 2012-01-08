@@ -1,0 +1,23 @@
+Package: libstuff-debug-perl
+Version: 0.03-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 60
+Depends: perl
+Section: perl
+Priority: optional
+Homepage: http://search.cpan.org/dist/Stuff-Debug/
+Description: convenient debugging output for perl programs
+ Stuff::Debug hold some state in the form of a set of debug levels. These
+ levels are categorized as "S" for script, "M" for module and "D" for
+ database.
+ .
+ The module provides a single function &db_out that is called to send
+ debugging messages to STDERR (or another handle if required) with a nice
+ format. Messages are given a level. If the level specified in the call to
+ &db_out is less than or equal to the current level held in the module, the
+ message will be printed, otherwise nothing will happen.
+ .
+ This is useful for peppering your programs with debugging output at various
+ levels of verbosity. By setting the module debug level a few or more or all
+ of these messages may be turned on and off.

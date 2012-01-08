@@ -1,0 +1,140 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Getopt::Long;
+use Stuff::Debug qw(&db_out);
+use Stuff::Usage qw(&usage &long_usage &version_message);
+use POSIX;
+
+use constant STUFF_PROG_DESCRIPTION => "decimal degree to dms converter";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2006; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.02";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+GetOptions(
+	   'help'              => sub { long_usage(0) },
+	   'version'           => sub { version_message(); exit 0; },
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   )     or usage(1);
+
+if ( $#ARGV < 2 ) {
+    while(<>) 
+    {
+	foreach my $dec (split(/\s+/,$_)) {
+	    convert($dec);
+	}
+    }
+}
+else {
+    foreach my $dec (@ARGV) {
+        convert($dec);
+    }
+}
+
+sub convert {
+    my ($dec) = shift || 0.0;
+
+    my ($d, $m, $s, $r);
+    $d = POSIX::floor($dec);
+    $r = ($dec - $d) * 60;
+    $m = POSIX::floor($r);
+    $s = ($r - $m)*60;
+   
+    printf("%dD %dM %.3fS\n", $d, $m, $s);
+}
+
+__END__
+
+=head1 NAME 
+
+dec2dms - degimal to degrees, minutes, seconds
+
+=head1 SYNOPSIS
+
+dec2dms [options] [I<file>]
+
+=head1 DESCRIPTION
+
+dec2dms read an angle decimal from I<file>, and outputs the
+same angle in DMS format.  If no file is provided, dec2dms reads
+floats from STDIN and prints out DMS degrees on STDOUT.
+
+=head1 OPTIONS
+
+=over
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--debug>=I<level>
+
+Set the script debugging level to I<level>.  This switch sets all
+types of debugging to this level.  If you want to discriminate between
+the various debugging types (MOdule, DBase, SCript), you should set
+the relevant environment variables instead of using this option.
+
+=item B<--version>
+
+Show program name, version info etc, and exit.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_??_DBLEVEL
+
+Sets debugging levels.  The ?? can be DB for database, MO for module,
+or SC for script debugging messages.  Generally only SC and DB are
+interesting for users, MO is mostly just used during development.
+
+=back
+
+=head1 FILES
+
+=over
+
+=item filename
+
+desc
+
+=back
+
+=head1 LICENSE
+
+dec2dms is released under the GNU GPL (version 3, 29 June 2007).
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2006-07-26 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+=cut
+

@@ -1,0 +1,12 @@
+Package: libstuff-statset-perl
+Version: 0.03-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 56
+Depends: perl, libstuff-debug-perl
+Section: perl
+Priority: optional
+Homepage: https://launchpad.net/stufftools/
+Description: simple statistical operations on sets of numbers
+ Provides adn object for storing numbers and performing some basic statistical
+ operations on them.

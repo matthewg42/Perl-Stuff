@@ -1,0 +1,434 @@
+#!/usr/bin/perl -w
+#
+# For usage information, invoke using --help option,
+# or run pod2text on this file.
+################################################################################
+# Overview of process
+#####################
+#
+# 1. Get a list of files in subdirectories
+# 2. Calulate checksum for each file
+#    - use printf("%010x%s", filesize, sum) as key in hash
+#      where the value is an array of filenames that match
+#      size and checksum (gh_sum_to_file)/
+#    - if there already exists 1 entry in gh_sum_to_file, 
+#      also add the key in gh_sum_to_file to gh_duplicates
+#      (the value being the "count" of duplicates).
+# 3. For each key in gh_duplicates:
+#    - fetch the list of keys from gh_sum_to_file. The first
+#      item in the list will be the master file.  For each 
+#      other file in the list, unlink the file and then create
+#      a symbolic link to th master with the same name. 
+#    - log what was done
+use strict;
+use Getopt::Long;
+use File::Find;
+use Digest::MD5  qw(md5);
+use Digest::SHA1 qw(sha1);
+use Stuff::Debug qw(&db_out $this_script);
+use Stuff::Usage qw(&usage &long_usage &version_message);
+use Stuff::ByteSize qw(&bytes2sz);
+use Stuff::RelPath qw(&relative_path);
+
+use constant STUFF_PROG_DESCRIPTION => "remove duplicates in OCAL";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2005; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.02";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+my $gs_flg_use_sha1       = 0;
+my $gs_flg_pretend        = 0; 
+my $gs_flg_extension      = undef;
+my $gs_flg_re_pattern     = undef;
+my $gs_flg_hidden_files   = 0;
+my $gs_flg_ignore_case    = 0;
+my $gs_flg_absolute_mode  = 0;   # 0 is relative link mode, 1 is full path mode
+my $gs_flg_verbose        = 0;
+
+# Some script scopers for gathering/processing data.
+my @ga_search_dirs;
+my %gh_sum_to_file;
+my %gh_duplicates;
+
+################################################################################
+# Command line parsing #
+########################
+
+GetOptions(
+	   'absolute-paths'    => \$gs_flg_absolute_mode,
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   'extension=s'       => \$gs_flg_extension,
+	   'help'              => sub { long_usage(0) },
+	   'hidden-files!'     => \$gs_flg_hidden_files,
+	   'ignore-case!'      => \$gs_flg_ignore_case,
+	   'pretend!'          => \$gs_flg_pretend,
+	   're-pattern=s'      => \$gs_flg_re_pattern,
+	   'sha1'              => \$gs_flg_use_sha1,
+	   'verbose'           => \$gs_flg_verbose,
+	   'version'           => sub { version_message(); exit 0; },
+	   )     or usage(1);
+
+if ( $#ARGV > -1 ) {
+    # In this case we have parameters which are the directories to
+    # search.
+    @ga_search_dirs = @ARGV;
+}
+else {
+    # The default is to search starting at the current directory
+    @ga_search_dirs = (".");
+}
+
+# if case ignoring is set, lower the extension.
+if ( $gs_flg_ignore_case ) {
+    $gs_flg_extension = lc($gs_flg_extension);
+}
+
+################################################################################
+# Main flow of the program
+##########################
+
+
+my $gs_original_pwd = $ENV{"PWD"};
+
+# This walks the directories, filters according to the options, and adds to 
+# %gh_duplicates and %gh_sum_to_file.
+walk_directories();         
+
+# explicitly make sure we're back in the original directory
+chdir $gs_original_pwd || die "can't chdir $gs_original_pwd : $!";
+
+# Now we have our duplicates identified we shall do what we want to do with them
+process_duplicates();
+
+exit 0;
+
+################################################################################
+# Sub-routines
+##############
+
+sub walk_directories {
+    find(\&filter_files, @ga_search_dirs);
+}
+
+sub filter_files {
+    # This function is called for each file in the directory walking
+    # process.
+    # 
+    # File::Find sets some variables for us to use:
+    # $File::Find::dir = current directory
+    # $_ = file basename
+    # $File::Find::name = current directory + basename
+    #
+    # Note that we are chdir'd into $File::Find::dir when this
+    # function is called
+    db_out(9, "filter_files: processing ". $File::Find::name);
+
+    my $pass_file = 1;
+    my $reject_reason = "passed";
+
+    if ( ! -f $_ ) {
+	$pass_file = 0;
+	$reject_reason = "not a file";
+	db_out(9, "filter_files: rejecting - not a file");
+    }
+    else {
+	# check by extension
+	if ( defined( $gs_flg_extension ) ) {
+	    my $cs_name;
+	    if ( $gs_flg_ignore_case ) {
+		# in this case $gs_flg_extension will already have been lowered
+		$cs_name = lc($_);
+	    }
+	    else {
+		$cs_name = $_;
+	    }
+	    
+	    if ( /\.$gs_flg_extension$/ ) {
+		db_out(9,"filter_files: ok - matched extension .$gs_flg_extension");		
+	    }
+	    else {
+		db_out(9,"filter_files: FAILED - does not match extension .$gs_flg_extension");
+		$reject_reason = "extension match failed";
+		$pass_file = 0;
+	    }
+	}
+
+	if ( defined($gs_flg_re_pattern) ) {
+	    my $rem = 0;  # regular expression match boolean
+	    if ( $gs_flg_ignore_case ) { $rem = /$gs_flg_re_pattern/i }
+	    else { $rem = /$gs_flg_re_pattern/ } 
+
+	    if ( $rem ) {
+		db_out(9,"filter_files: ok - matched re $gs_flg_re_pattern"); 
+	    }
+	    else {
+		$pass_file = 0;
+		$reject_reason = "re match failed";
+		db_out(9,"filter_files: FAILED - doesn't match re $gs_flg_re_pattern");
+	    }
+	}
+
+    }
+
+    db_out(7, "filter_files: pass=$pass_file; reason=$reject_reason -> $File::Find::name");
+    if ( $pass_file ) {
+	process_file($_, $File::Find::name);
+    }
+
+    return $pass_file;
+}
+
+sub process_file {
+    my $filename = shift || die "erk, nothing passed to process_file!";
+    my $path = shift || die "erk, not enough passed to process_file!";
+    my $cksummer;
+
+    # remove leading "./" on paths
+    $path =~ s/^(\.\/)+//;
+
+    # OK, so we have a file to process.  We want to calculate the 
+    # checksum and get the size of the file. 
+
+    # Setup checksum object
+    if ( $gs_flg_use_sha1 ) {
+	$cksummer = Digest::SHA1->new;
+    }
+    else {
+	$cksummer = Digest::MD5->new;
+    }
+
+    if ( ! open(THISFILE, "<$filename") ) {
+	db_out(0, "cannot open file for reading - $! : $filename");
+	return;
+    }
+
+    $cksummer->addfile(*THISFILE);
+    close(THISFILE);
+
+    my $key = sprintf("%010d_%s", (stat($filename))[7], $cksummer->hexdigest);
+    db_out(6, "process_file: adding $key for $path");
+
+    if ( defined( $gh_sum_to_file{$key} ) ) {
+	# this one already exists - aha - we have found a duplicate!
+	$gh_duplicates{$key} = 1;
+	$gh_sum_to_file{$key} = [@{$gh_sum_to_file{$key}}, $path];
+	db_out(5, "duplicate detected: $path");
+    }
+    else {
+	$gh_sum_to_file{$key} = [$path];	
+    }
+}
+
+sub process_duplicates {
+    my $space_saved = 0;
+    my $duplicates_removed = 0;
+    my $duplicate_groups = 0;
+
+    foreach my $k (keys %gh_duplicates) {
+	my @duplicate_list = @{$gh_sum_to_file{$k}};
+	my $master = shift @duplicate_list;
+	$duplicate_groups++;
+	foreach my $duplicate (@duplicate_list) {
+	    $space_saved +=  (stat($duplicate))[7];
+	    $duplicates_removed++;
+	    my $master_path;
+	    if ( $gs_flg_absolute_mode ) {
+		$master_path = $gs_original_pwd . "/" . $master; 
+	    }
+	    else {
+		$master_path = relative_path($master, $duplicate);
+	    }
+	    my $cmd = "ln -s $master_path $duplicate";
+	    db_out(5, "cmd = $cmd");
+	    
+	    if ( $gs_flg_pretend ) {
+		print "executing [pretending]: $cmd\n";
+	    }
+	    else {
+		print "executing $cmd\n" if ( $gs_flg_verbose );   
+		unlink $duplicate;
+		system $cmd || db_out(0, "problem when executing $cmd");
+	    }
+	}
+    }
+
+    print "\n\n" if ( $gs_flg_verbose || $gs_flg_pretend );
+
+    if ( $gs_flg_pretend ) {
+	print "The program was executed in pretend mode.\nIf it had been run in real mode, the following would have been done:\n";
+    }
+
+    if ( $gs_flg_verbose || $gs_flg_pretend ) {
+	printf "Number of masters:         %20d\n", $duplicate_groups;
+	printf "Number of links created:   %20d\n", $duplicates_removed;
+	printf "Total disk space saved:    %20s\n", bytes2sz($space_saved);
+    }
+}
+
+__END__
+
+################################################################################
+# POD docs
+##########
+
+=head1 NAME 
+
+remdup - remove duplicates from the OCAL library
+
+=head1 SYNOPSIS
+
+remdup [options] [directories]
+
+=head1 DESCRIPTION
+
+B<remdup> walks directory hierarchy(s) and looks for files with the same
+contents.  Files that match by md5sum and size are considered
+duplicates. The first file found in a set of duplicates is considered
+the "master".  All others are deleted and a symbolic link to the
+master file is created in their places.
+
+If no directories are supplied as command line parameters, the current
+working directory (.) is used.
+
+By using various command line options, it is possible to filter files
+by filename extension and regular expression on the path of the
+file.  If both filtering options are supplies, a file must pass
+B<both> conditions to be processed.
+
+=head1 OPTIONS
+
+=over
+
+=item B<--absolute-paths>
+
+When specified, this option causes links to be made to full paths.  The 
+default is to create links to relative paths. 
+
+=item B<--debug>=I<level>
+
+Print diagnostic messages while executing.  The value of I<level> must be an
+integer.  The higher the number, the more verbose the diagnostic output will
+be.
+
+=item B<--extension>=I<ext>
+
+Only check files that have the extension .I<ext> - an extension is
+considered to be anything that follows the last "." in a filename.
+If no "." is found in a filename, a file is considered not to have
+an extension and will not be matched.
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--hidden-files> or I<--nohidden-files>
+
+B<--hidden-files> turns on matching of hidden files.
+B<--nohidden-files> turns matching of hidden files off.  Hidden
+files are identified by the unix convention of having their
+basnname startin with a "." character.  By default hidden files
+are not processed.
+
+=item B<--ignore-case> or B<--noignore-case>
+
+When matching REs or file extensions, ignore case (or don't).  The
+default is the unix convention of not ignoring case.
+
+=item B<--pretend> or B<--nopretend>
+
+This option sets or clears I<pretend> more.  Pretend mode means that
+no modificiation of the filesystem is done - only a list of what
+would be done if pretend mode was not set is printed.  At time of
+writing (testing phase), pretend mode is set by default.  I expect
+this to be removed for the release version of this tool.
+
+=item B<--re-pattern>=I<exp>
+
+If provided, only files whole B<releative path> matches the perl style
+regular expression I<exp> will be processed (i.e. not just the file
+basename).
+  
+=item B<--sha1>
+
+By default remdup uses the MD5 checksum algorithm.  Recently this
+method has been hitting the nerd press for it's vulnerability to
+injections attacks.  Consequently, the newer, more secure SHA1
+algorithm may be used if the user derires, although it is not the
+default as the MD5 algorithm is considerably faster, and the
+"friendly" environment that the program is intended to operate in
+doesn't really justify the extra overhead of SHA1
+
+=item B<--verbose>
+
+Increase the amout of output the program prints on standard output as
+it runs. The default is to print nothing unless there is an error.  
+If the B<--verbose> option is used, you'll get a list of links that
+have been made, as well as a summary of the number and space saved at
+the end of the program execution.
+
+=item B<--version>
+
+Print the program description and version.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_?_DBLEVEL
+
+Sets debugging levels.  The ? can be D for database, M for module,
+or S for script debugging messages.  Generally only S and D are
+interesting for users, M is mostly just used during development.
+
+=back
+
+=head1 FILES
+
+=over
+
+=item filename
+
+desc
+
+=back
+
+=head1 LICENSE
+
+remdup is released under the GNU GPL (version 3, 29 June 2007).
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2005-09-27 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+
+=cut
+
+
+

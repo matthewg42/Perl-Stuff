@@ -1,0 +1,15 @@
+Package: libstuff-relpath-perl
+Version: 0.02-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 60
+Depends: perl, libstuff-debug-perl, libstuff-text-perl
+Section: perl
+Priority: optional
+Homepage: https://launchpad.net/stufftools/
+Description: (no short description found)
+ Stuff::RelPath is used to generate relative paths for the creation of
+ symbolic links. It does no filesystem checking at all - it is simply
+ processing strings. Therefore it doesn't know if the paths you provide are
+ existing or not on the system - you need to mkdir -p the dirname of the
+ symlink if it doesn't exist, and all that good stuff.

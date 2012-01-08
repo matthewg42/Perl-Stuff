@@ -1,0 +1,20 @@
+Source: libstuff-table-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 7)
+Build-Depends-Indep: perl
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Standards-Version: 3.8.4
+Homepage: https://launchpad.net/stufftools/
+
+Package: libstuff-table-perl
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}, libstuff-debug-perl, libstuff-column-perl,
+ libstuff-text-perl
+Description: Fixed width character table printing class
+ Stuff::Table provides an alternative to perl form output for some simple
+ tabular formats. A Stuff::Table object contains description of table columns.
+ It may then be fed data and will return correctly formatted rows of output
+ for use as the programmer wishes. Note that this is only going to be useful
+ for use on fixed-width-font terminals and the like, and the output isn't
+ exactly beautiful. Still, it's good for knocking together quick reports.

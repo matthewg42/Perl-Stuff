@@ -1,0 +1,100 @@
+Stuff Tools
+===========
+
+
+Introduction
+------------
+
+Stuff Tools comprises a bunch of perl modules and utility programs.
+There's some useful, erm, stuff in there.  Some examples:
+
+  groupby	- provides statistical aggregation function for 
+		  textual input in the unix fiter program tradition.
+  sq, dq        - trivial quoting programs to help use find & xargs
+		  with filenames that contain whitespace.  
+		  sq=single quote, dq=double quote.
+  ascii2morse   - you want to type out morse code with a qwerty 
+		  keyboard, right?
+  sumup		- adds up numbers in the unix filter style.  Outputs
+		  statistical operations on set - sum, mean etc.
+		  also can output is proper byte units like KiB
+  dms2dec	- degrees, minutes and seconds to decimal.  Useful
+		  for people who make angular measurements.
+  
+These are only really examples of how to use the perl modules.  The
+modules contain a variety of nice utility functions including, but not
+limited to:
+
+  * convenient and flexible pretty debugging output
+  * keep pod docs in your programs and generate usage info directly
+    - no need to maintain two files.  Yes this is more of less the
+    same as doing "pod2text ... $0", but a lot cleaner to use.
+  * operations on numerical ranges
+  * tabular output of data (alternative to perl "write" which is
+    better for some kinds of data)
+  * morse code parsing and conversion, including American Morse 
+    dialect (something the existing CPAN morse modules don't do)
+  * CSV creation and parsing from an to arrays.  With proper escaping 
+    of quotes and delimiters.
+
+
+How you can help
+----------------
+
+Since Stuff Tools are in a pretty early stage of development, one of
+the easiest and best ways of helping to to provide feedback.  For now
+this just means emailing the author (see below for details).
+
+However, it would also be great to contribute code, bug reports or
+documentation.
+
+
+History
+-------
+
+Stuff utilities was borne out of the frustration derived from
+re-implpementing the same old perl bits and bobs each time I started a
+new contract.  I've developed some useful little gizmos over the years
+and it's annoying that each time I start a new contract I have to
+implament a-fresh (since implementations for one employer usually
+belong to them).
+
+So I decided to implement this little toolset so that I can use it as
+a generic base which I can then specialize for new customers.  The way
+I've set out the licensing should mean that I can use the generic
+parts distributed here, but use them as a base to write code that is
+OK for customers to keep and use as they wish without the more
+restrictive aspects of some licensing models..
+
+All code in this project is a clean-room implementation - I was not
+employed by anyone to write any code distributed in the Stuff Tools.
+
+
+Licensing
+---------
+
+All modules are licensed under the GNU LGPL version 3.
+
+All programs are licensed under the GNU GPL version 3.
+
+There should be copies of the GPL and LGPL in the file in which you
+received the distribution.  The file names are LICENSE.GPL and
+LICENSE.LGPL (in the "docs" directory).
+
+If you did not receive these files, try here:
+
+http://www.gnu.org/licenses/licenses.html#GPL
+
+http://www.gnu.org/licenses/licenses.html#LGPL
+
+
+Author
+------
+
+The author of the Stuff Tools is:
+
+Matthew Gates <matthew@porpoisehead.net>
+
+Enjoy,
+-- 
+Matthew

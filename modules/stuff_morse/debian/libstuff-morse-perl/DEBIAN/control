@@ -1,0 +1,13 @@
+Package: libstuff-morse-perl
+Version: 0.02-1
+Architecture: all
+Maintainer: Matthew Gates <matthew@porpoisehead.net>
+Installed-Size: 68
+Depends: perl, libstuff-debug-perl
+Section: perl
+Priority: optional
+Homepage: https://launchpad.net/stufftools/
+Description: morse code fun with perl
+ For converting ASCII to and from Morse code. The module supports English
+ language only at this time (no accented or non-latin character set letters),
+ but both international and american morse dialects are supported.

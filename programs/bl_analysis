@@ -1,0 +1,79 @@
+#!/usr/bin/perl -w
+
+
+use strict;
+use Getopt::Long;
+use vars qw($VERSION $PROGDESC $AUTHOR);
+use Stuff::Debug qw(db_out);
+use Stuff::Usage qw(usage long_usage);
+
+BEGIN {
+    $PROGDESC = "Blacklist Analysis";
+    $AUTHOR   = "Matthew Gates";
+    $VERSION  = "0.01";
+
+    db_out(1, "$Stuff::Debug::this_script version $VERSION, starting");
+}
+
+GetOptions(
+	   'help'              => sub { long_usage(0) },
+	   'version'           => sub { print $PROGDESC . " by " . $AUTHOR . "\n" . $VERSION . "\n"; },
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   )     or usage(1);
+
+
+my %gh_group_stats;
+my %gh_totals;
+my %gh_groups;
+
+while (<>) {
+    chomp;
+    if ( /^((\d+\.\d+\.\d+)\.\d+)\s+(.*)$/ ) {
+	my $ip = $1;
+	my $group = $2 . ".x";
+	my $flags = $3;
+
+	inc_stat(\%gh_totals, "total");
+	$gh_groups{$group} = 1;
+
+	if ( $flags =~ /EXPLOIT/ ) {
+	    inc_stat(\%gh_totals, "exploitable");
+	    inc_stat(\%gh_group_stats, "$group:exploitable");
+	}
+	else {
+	    inc_stat(\%gh_totals, "not-exploitable");
+	    inc_stat(\%gh_group_stats, "$group:not-exploitable");
+	}
+
+	# print "ip=$ip; group=$group; flags=$flags\n"; 
+    }
+    else {
+	print "BUUURP\n";
+    }
+}
+
+
+printf "%-16s %5s %5s %5s %5s\n\n", "Group", "Bad", "OK", "Total", "%Bad";
+foreach my $g (sort keys %gh_groups) {
+    my $ex = $gh_group_stats{"$g:exploitable"} || 0;
+    my $ok = $gh_group_stats{"$g:not-exploitable"} || 0;
+    my $to = $ex + $ok;
+    my $pc = $ex * 100 / $to; 
+
+    printf "%-16s %5d %5d %5d %5.1f\n", $g, $ex, $ok, $to, $pc;
+}
+
+
+
+sub inc_stat {
+    my $hr = shift;
+    my $statname = shift;
+    my $amount = shift || 1;
+
+    if ( defined($$hr{$statname}) ) {
+	$$hr{$statname} += $amount;
+    }
+    else {
+	$$hr{$statname} = $amount;
+    }
+}
