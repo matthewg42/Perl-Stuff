@@ -23,14 +23,16 @@ my $gs_max_lines 		= 0;
 my $gs_delimiter		= '\s+';
 my $gs_headers			= 0;
 my $gs_comment_re		= undef;
+my $gs_gutter_wigth		= 2;
 
 GetOptions(
            'comment=s'         => \$gs_comment_re,
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+           'delimiter=s'       => \$gs_delimiter,
+           'gutter-width=i'    => \$gs_gutter_wigth,
            'headers'           => \$gs_headers,
 	   'help'              => sub { long_usage(0) },
 	   'version'           => sub { version_message(); exit 0; },
-	   'debug=i'           => \$Stuff::Debug::debug_level{S},
-           'delimiter=s'       => \$gs_delimiter,
 	   )     or usage(1);
 
 my $gs_header_print		= $gs_headers;
@@ -76,7 +78,7 @@ while(<>) {
 	}
 }
 
-my $t = new Stuff::Table('empty' => '');
+my $t = new Stuff::Table('empty' => '', 'gutter' => ' ' x $gs_gutter_wigth);
 
 for(my $i=0; $i<=$#sizes; $i++) {
 	my $name = $i;
@@ -138,6 +140,11 @@ be.
 
 Use I<re> as the input field delimiter where I<re> is a Perl style regular 
 expression. 
+
+=item B<--gutter-width>=I<n>
+
+Specify the width of the "gutter" between output columns (number of space 
+characters).  The default is 2.
 
 =item B<--headings>
 

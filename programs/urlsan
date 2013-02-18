@@ -61,6 +61,13 @@ sub process_line {
 	while(s/\%([A-Fa-f0-9]{2})/chr(hex($1))/e) {
 		if ($gs_unwrap) {
 			s|^https?://.*(https?)://|$1://|;
+			# and get rid of h=eAQHjqcGxAQEvQ_FZ4BpHgIhcXFnwFmwBStqV1hd_ivX0kA backlink ID
+			s/[\?\&]h=[a-zA-Z_0-9]+//;
+
+			# fb_action_ids=10150516073673917,356147977744562,10150678656357715,10150678652597715,10150678647487715&fb_action_types=news.reads&fb_source=other_multiline&response_type=token&display=async&perms=publish_actions&auth_referral=1
+			s/[\?\&]fb_action_ids=[^\?\&]+//;
+			s/[\?\&]fb_action_types=[^\?\&]+//;
+			s/[\?\&]fb_source=[^\?\&]+//;
 		}
                 1;
         }
