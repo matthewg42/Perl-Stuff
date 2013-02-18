@@ -238,7 +238,7 @@ Returns a string that can be used with printf to print an array of data.
 sub format {
     my $self = shift;
     my $str = "";
-    my $gut = $self->gutter;
+    my $gut = $self->gutter();
     foreach my $name ( @{$self->{_column_order}} ) {
 	$str .= $self->{_columns}{$name}->format . $gut;
     }
@@ -257,7 +257,7 @@ data.  The gutter string separates the columns.
 sub title_str {
     my $self = shift;
     my $str = "";
-    my $gut = $self->gutter;
+    my $gut = $self->gutter();
     my @titles = ();
     foreach my $name ( @{$self->{_column_order}} ) {
 	$str .= $self->{_columns}{$name}->format_string . $gut;
@@ -295,7 +295,7 @@ title_str().
 sub underline_str {
     my $self = shift;
     my $char = shift;
-    my $gut = $self->gutter;
+    my $gut = $self->gutter();
     if ( ! defined( $char ) ) {
 	$char = "-";
     }
@@ -325,7 +325,7 @@ sub array_row {
     my @data = @_;
     my $str = "";
     my $i=0;
-    my $gut = $self->gutter;
+    my $gut = $self->gutter();
 
     foreach my $name ( @{$self->{_column_order}} ) {
 	if ( defined( $data[$i] ) ) {
@@ -339,7 +339,7 @@ sub array_row {
 	$i++;
     }
 
-    $str =~ s/$gut$//;
+    $str = substr($str, 0, 0-length($gut));
 
     sprintf( $str . $self->{_line_append},  @data );
 }
@@ -389,7 +389,7 @@ sub hash_row {
     my %data = @_;
     my @line = ();
     my $str = "";
-    my $gut = $self->{_gutter};
+    my $gut = $self->gutter();
 
     foreach my $name ( @{$self->{_column_order}} ) {
 	if ( defined( $data{$name} ) ) {
