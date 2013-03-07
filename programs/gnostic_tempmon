@@ -1,0 +1,173 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use Stuff::Debug qw(&db_out);
+use Stuff::Usage qw(&usage &long_usage &version_message);
+use Stuff::Gnostic;
+use Stuff::ExpirySet;
+use Stuff::StatSet;
+use Time::HiRes qw(usleep);
+
+use constant STUFF_PROG_DESCRIPTION => "Gnostic temperature monitor";
+use constant STUFF_PROG_COPYRIGHT   => "(C) 2013; released under the GNU GPL version 2";
+use constant STUFF_PROG_VERSION     => "0.01";
+use constant STUFF_PROG_AUTHOR      => "Matthew Gates (Mouse)";
+
+BEGIN {
+    db_out(1, "program starting");
+}
+
+END {
+    db_out(1, "program exiting with status " . ($? || 0));
+}
+
+my $gs_update_seconds = 0.5;
+my %gh_known_monitors;
+
+GetOptions(
+	   'help'              => sub { long_usage(0) },
+	   'version'           => sub { version_message(); exit 0; },
+	   'debug=i'           => \$Stuff::Debug::debug_level{S},
+	   'update=f'          => \$gs_update_seconds,
+	   )     or usage(1);
+
+my $g = Stuff::Gnostic->new();
+
+while(1) {
+	open(SENSORS, "sensors -u|") || bad_exec();
+    my $current_sensor = "[unknown sesnor]";
+    my $next_is_sensor = 1;
+    my $current_adapter = "[unknown adapter]";
+    my $sub_adapter = "";
+    my $now = time;
+    while(<SENSORS>) {
+        chomp;
+        if ($next_is_sensor == 1) {
+            $current_sensor = $_;
+            $next_is_sensor = 0;
+            next;
+        }
+
+        if (/^\s*$/) {
+            $next_is_sensor = 1;
+            next;
+        }
+
+        if (/^Adapter:\s*(.*)\s*$/) {
+            $current_adapter = $1;
+            $sub_adapter = "";
+            next;
+        }
+        elsif (/^(\w+):\s*$/) {
+            $sub_adapter = $1;
+            next;
+        }
+
+        if (/^\s+(temp\S+):\s+(\d+\.\d+)\s*/) {
+            my $desc = "$current_sensor/$current_adapter";
+            $desc .= "/$sub_adapter" if ($sub_adapter ne "");
+            $desc .= "/$1";
+            print $g->item($desc, $2);
+            $gh_known_monitors{$desc} = 1;
+        }
+    }
+    close(SENSORS);
+    usleep(1000000*$gs_update_seconds);
+}
+
+sub bad_exec {
+    foreach my $m (keys %gh_known_monitors) {
+        print $g->item($m, -1);
+    }
+}
+
+exit(0);
+
+__END__
+
+=head1 NAME 
+
+gnostic_tempmon - monitor system temperature sensors for input to Gnostic
+
+=head1 SYNOPSIS
+
+gnostic_tempmon [options]
+
+=head1 DESCRIPTION
+
+This program gets temperature data from the I<sensors> program and outputs periodic
+values of each sensor in the system in a format which is suitable for input into
+Gnostic.
+
+=head1 OPTIONS
+
+=over
+
+=item B<--debug>=I<level>
+
+Print diagnostic messages while executing.  The value of I<level> must be an
+integer.  The higher the number, the more verbose the diagnostic output will
+be.
+
+=item B<--help>
+
+Print the command line syntax an option details.
+
+=item B<--update>=I<s>
+
+Set the update delay to I<s> seconds.
+
+=item B<--version>
+
+Print the program description and version.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item STUFF_?_DBLEVEL
+
+Sets debugging levels.  The ? can be D for database, M for module,
+or S for script debugging messages.  Generally only S and D are
+interesting for users, M is mostly just used during development.
+
+=back
+
+=head1 LICENSE
+
+gnostic_tempmon is released under the GNU GPL (version 3, 29 June 2007).  A
+copy of the license should have been provided in the distribution of
+the software in a file called "LICENSE.GPL".  If you can't find this, then
+try here: http://www.gnu.org/copyleft/gpl.html
+
+=head1 AUTHOR
+
+Matthew Gates <matthew@porpoisehead.net>
+
+http://porpoisehead.net/
+
+=head1 CHANGELOG
+
+=over
+
+=item Date:2013-03-07 Created, Author MNG
+
+Original version.
+
+=back
+
+=head1 BUGS
+
+Please report bugs to the author.
+
+=head1 SEE ALSO
+
+See http://porpoisehead.net/mysw/gnostic for more information about Gnostic.
+
+=cut
+
